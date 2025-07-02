@@ -81,7 +81,7 @@ jobs:
             netrc=NETRC
           build-args: |
             INTEGRATION=${{ matrix.integration }}
-            LDFLAGS=-s -w -X github.com/crashappsec/ocular-default-integrations/internal/config.Version=${{ github.event.release.tag_name }} -X github.com/crashappsec/ocular-default-integrations/internal/config.BuildDate=${{steps.date.outputs.date}} -X github.com/crashappsec/ocular-default-integrations/internal/config.GitCommit=${{ github.sha }}
+            LDFLAGS=-s -w -X github.com/crashappsec/ocular-default-integrations/internal/config.Version=${{ github.event.release.tag_name }} -X github.com/crashappsec/ocular-default-integrations/internal/config.BuildTime=${{steps.date.outputs.date}} -X github.com/crashappsec/ocular-default-integrations/internal/config.Commit=${{ github.sha }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: |
