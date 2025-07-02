@@ -1,0 +1,91 @@
+name: cd
+on:
+  release:
+    types: [prereleased, released]
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: 1.24
+  RELEASE_NAME: ${{ github.ref_name }}
+  GOPRIVATE: github.com/crashappsec/ocular
+  RELEASE_FILE_NAME: 'ocular-default-integrations-definitions-${{ github.ref_name }}.zip'
+
+jobs:
+  publish-definitions:
+    name: publish definitions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: setup go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: 'go.sum'
+      - name: generate definitions
+        run: |
+          go run ./hack/scripts/generate-definitions/main.go -output-folder ./out \
+            -image-tag "$RELEASE_NAME"
+          
+          cd out && zip -r ../$RELEASE_FILE_NAME .
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2
+        with:
+          files: ${{ env.RELEASE_FILE_NAME }}
+  publish-docker:
+    name: publish docker images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        integration: [crawlers, downloaders, uploaders]
+      fail-fast: false
+    permissions:
+      packages: write
+      contents: read
+#      id-token: write
+    env:
+      TAG: "ghcr.io/${{ github.repository_owner }}/ocular-default-${{ matrix.integration }}:${{ github.ref_name }}"
+      LATEST: "ghcr.io/${{ github.repository_owner }}/ocular-default-${{ matrix.integration }}:latest"
+    steps:
+      - name: checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Chalk
+        uses: crashappsec/setup-chalk-action@e4bfa48190eb4d01e96c61cffa0bc6deeabdad8a # main
+      - name: setup qemu
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+      - name: setup buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+      - name: docker build
+        id: docker-build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        env:
+          NETRC:
+            | 
+            machine github.com
+            login ${{ github.repository_owner }}
+            password ${{ secrets.OCULAR_READ_TOKEN }}
+        with:
+          secret-envs: |
+            netrc=NETRC
+          build-args: |
+            INTEGRATION=${{ matrix.integration }}
+            LDFLAGS=-s -w -X github.com/crashappsec/ocular-default-integrations/internal/config.Version=${{ github.event.release.tag_name }} -X github.com/crashappsec/ocular-default-integrations/internal/config.BuildDate=${{steps.date.outputs.date}} -X github.com/crashappsec/ocular-default-integrations/internal/config.GitCommit=${{ github.sha }}
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: |
+            ${{ env.TAG }}
+            ${{ (github.event.release.prerelease && '') || env.LATEST }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

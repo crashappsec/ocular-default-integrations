@@ -1,0 +1,5 @@
+image: ghcr.io/crashappsec/ocular-default-integrations:latest
+secrets:
+    - name: git-config
+      mountType: file
+      mountTarget: /etc/gitconfig

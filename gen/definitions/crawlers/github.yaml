@@ -1,0 +1,19 @@
+image: ghcr.io/crashappsec/ocular-default-integrations:latest
+secrets:
+    - name: github-token
+      mountType: envVar
+      mountTarget: GITLAB_TOKEN
+parameters:
+    DOWNLOADER:
+        description: Override the downloader for the crawler. The default will be chosen based on the crawler type.
+        required: false
+    GITHUB_ORGS:
+        description: Comma-separated list of GitLab groups to crawl.
+        required: true
+    PROFILE:
+        description: Profile to use for the crawler.
+        required: true
+    SLEEP_DURATION:
+        description: Duration to sleep between requests. Will be parsed as a time.Duration.
+        required: false
+        default: 1m

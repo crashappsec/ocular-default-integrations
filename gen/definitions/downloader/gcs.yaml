@@ -1,0 +1,5 @@
+image: ghcr.io/crashappsec/ocular-default-integrations:latest
+secrets:
+    - name: downloader-gcs-credentials
+      mountType: file
+      mountTarget: GOOGLE_APPLICATION_CREDENTIALS
