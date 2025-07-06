@@ -63,7 +63,7 @@ func main() {
 	}
 
 	downloaders := generateDownloaderDefinitions(image)
-	downloaderFolder := filepath.Join(outputFolder, "downloader")
+	downloaderFolder := filepath.Join(outputFolder, "downloaders")
 	if err = os.MkdirAll(downloaderFolder, 0o750); err != nil {
 		zap.L().Fatal("downloader folder could not be created", zap.Error(err))
 	}
