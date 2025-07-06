@@ -48,8 +48,9 @@ jobs:
       contents: read
 #      id-token: write
     env:
+      IMAGE: "ghcr.io/${{ github.repository_owner }}/ocular-default-${{ matrix.integration }}"
       TAG: "ghcr.io/${{ github.repository_owner }}/ocular-default-${{ matrix.integration }}:${{ github.ref_name }}"
-      LATEST: "ghcr.io/${{ github.repository_owner }}/ocular-default-${{ matrix.integration }}:latest"
+      LATEST: "ghcr.io/${{ github.repository_owner }}/ocular-default-${{ matrix.integration }}:latest-prerelease"
     steps:
       - name: checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -61,6 +62,9 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set latest tag
+        run: echo "LATEST=$IMAGE:latest" >> $GITHUB_ENV
+        if: ${{ ! github.event.release.prerelease }}
       - name: Set up Chalk
         uses: crashappsec/setup-chalk-action@e4bfa48190eb4d01e96c61cffa0bc6deeabdad8a # main
       - name: setup qemu
@@ -86,6 +90,6 @@ jobs:
           push: true
           tags: |
             ${{ env.TAG }}
-            ${{ (github.event.release.prerelease && '') || env.LATEST }}
+            ${{ env.LATEST }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
