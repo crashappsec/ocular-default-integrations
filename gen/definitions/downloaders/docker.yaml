@@ -1,4 +1,4 @@
-image: ghcr.io/crashappsec/ocular-default-integrations:latest
+image: ghcr.io/crashappsec/ocular-default-downloaders:latest
 secrets:
     - name: downloader-dockerconfig
       mountType: file

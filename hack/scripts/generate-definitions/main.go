@@ -44,8 +44,6 @@ func main() {
 	zap.L().Info("generating definitions")
 	flag.Parse()
 
-	image := "ghcr.io/crashappsec/ocular-default-integrations:" + imageTag
-
 	if outputFolder == "" {
 		zap.L().Fatal("--output-folder is required")
 	}
@@ -62,7 +60,7 @@ func main() {
 		zap.L().Fatal("--output-folder could not be created", zap.Error(err))
 	}
 
-	downloaders := generateDownloaderDefinitions(image)
+	downloaders := generateDownloaderDefinitions(imageTag)
 	downloaderFolder := filepath.Join(outputFolder, "downloaders")
 	if err = os.MkdirAll(downloaderFolder, 0o750); err != nil {
 		zap.L().Fatal("downloader folder could not be created", zap.Error(err))
@@ -85,7 +83,7 @@ func main() {
 		_ = file.Close()
 	}
 
-	crawlers := generateCrawlerDefinitions(image)
+	crawlers := generateCrawlerDefinitions(imageTag)
 	crawlerFolder := filepath.Join(outputFolder, "crawlers")
 	if err = os.MkdirAll(crawlerFolder, 0o750); err != nil {
 		zap.L().Fatal("crawler folder could not be created", zap.Error(err))
@@ -106,7 +104,7 @@ func main() {
 		_ = file.Close()
 	}
 
-	uploaders := generateUploaderDefinitions(image)
+	uploaders := generateUploaderDefinitions(imageTag)
 	uploaderFolder := filepath.Join(outputFolder, "uploaders")
 	if err = os.MkdirAll(uploaderFolder, 0o750); err != nil {
 		zap.L().Fatal("uploader folder could not be created", zap.Error(err))
@@ -128,31 +126,31 @@ func main() {
 	}
 }
 
-func generateDownloaderDefinitions(image string) map[string]schemas.Downloader {
+func generateDownloaderDefinitions(imageTag string) map[string]schemas.Downloader {
 	result := make(map[string]schemas.Downloader)
 	for downloader, spec := range downloaders.GetAllDefaults() {
 		def := spec.Definition
-		def.Image = image
+		def.Image = "ghcr.io/crashappsec/ocular-default-downloaders:" + imageTag
 		result[downloader] = def
 	}
 	return result
 }
 
-func generateCrawlerDefinitions(image string) map[string]schemas.Crawler {
+func generateCrawlerDefinitions(imageTag string) map[string]schemas.Crawler {
 	result := make(map[string]schemas.Crawler)
 	for downloader, spec := range crawlers.GetAllDefaults() {
 		def := spec.Definition
-		def.Image = image
+		def.Image = "ghcr.io/crashappsec/ocular-default-crawlers:" + imageTag
 		result[downloader] = def
 	}
 	return result
 }
 
-func generateUploaderDefinitions(image string) map[string]schemas.Uploader {
+func generateUploaderDefinitions(imageTag string) map[string]schemas.Uploader {
 	result := make(map[string]schemas.Uploader)
 	for downloader, spec := range uploaders.GetAllDefaults() {
 		def := spec.Definition
-		def.Image = image
+		def.Image = "ghcr.io/crashappsec/ocular-default-uploaders:" + imageTag
 		result[downloader] = def
 	}
 	return result
