@@ -1,5 +1,5 @@
 image: ghcr.io/crashappsec/ocular-default-downloaders:latest
 secrets:
-    - name: git-config
+    - name: downloader-gitconfig
       mountType: file
       mountTarget: /etc/gitconfig

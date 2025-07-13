@@ -25,7 +25,7 @@ var allDownloaders = map[string]DefaultDownloader{
 		Definition: schemas.Downloader{
 			Secrets: []schemas.SecretRef{
 				{
-					Name:        "git-config",
+					Name:        "downloader-gitconfig",
 					MountType:   schemas.SecretMountTypeFile,
 					MountTarget: "/etc/gitconfig",
 				},
