@@ -11,13 +11,13 @@ package uploaders
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
 	"os"
 	"path/filepath"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	s3Service "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
+	"github.com/hashicorp/go-multierror"
 	"go.uber.org/zap"
 )
 
