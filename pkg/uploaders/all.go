@@ -33,7 +33,7 @@ var allUploaders = map[string]DefaultUploader{
 				Secrets: []schemas.SecretRef{
 					{
 						Name:        "uploader-awsconfig",
-						MountTarget: "/root/.aws/config",
+						MountTarget: AWSConfigFileMountPath,
 						MountType:   schemas.SecretMountTypeFile,
 					},
 				},

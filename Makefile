@@ -38,10 +38,10 @@ endif
 define NETRC
   machine github.com
   login x-access-token
-  password ${GITHUB_PAT}
+  password ${GITHUB_TOKEN}
 endef
 
-ifneq ($(GITHUB_PAT),)
+ifneq ($(GITHUB_TOKEN),)
 	export NETRC
 endif
 
@@ -55,9 +55,9 @@ ifneq ($(DOCKER_DEFAULT_PLATFORM),)
 endif
 OCULAR_IMAGE_REGISTRY ?= ghcr.io
 OCULAR_IMAGE_TAG ?= local
-OCULAR_DEFAULT_DOWNLOADER_IMAGE_REPOSITORY ?= crashappsec/ocular-default-downloader
-OCULAR_DEFAULT_CRAWLER_IMAGE_REPOSITORY ?= crashappsec/ocular-default-crawler
-OCULAR_DEFAULT_UPLOADER_IMAGE_REPOSITORY ?= crashappsec/ocular-default-uploader
+OCULAR_DEFAULT_DOWNLOADER_IMAGE_REPOSITORY ?= crashappsec/ocular-default-downloaders
+OCULAR_DEFAULT_CRAWLER_IMAGE_REPOSITORY ?= crashappsec/ocular-default-crawlers
+OCULAR_DEFAULT_UPLOADER_IMAGE_REPOSITORY ?= crashappsec/ocular-default-uploaders
 
 OCULAR_DEFAULT_DOWNLOADER_IMAGE ?= ${OCULAR_IMAGE_REGISTRY}/${OCULAR_DEFAULT_DOWNLOADER_IMAGE_REPOSITORY}:${OCULAR_IMAGE_TAG}
 OCULAR_DEFAULT_CRAWLER_IMAGE ?= ${OCULAR_IMAGE_REGISTRY}/${OCULAR_DEFAULT_CRAWLER_IMAGE_REPOSITORY}:${OCULAR_IMAGE_TAG}

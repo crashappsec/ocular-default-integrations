@@ -68,9 +68,9 @@ func main() {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			l.Warn("file does not exist, skipping", zap.String("file", file))
 		} else if err != nil {
-			validatedFiles = append(validatedFiles, file)
-		} else {
 			l.Warn("unable to stat file, skipping", zap.String("file", file), zap.Error(err))
+		} else {
+			validatedFiles = append(validatedFiles, file)
 		}
 	}
 

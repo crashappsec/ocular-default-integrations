@@ -2,7 +2,7 @@ image: ghcr.io/crashappsec/ocular-default-uploaders:latest
 secrets:
     - name: uploader-awsconfig
       mountType: file
-      mountTarget: /root/.aws/config
+      mountTarget: /aws/config
 parameters:
     BUCKET:
         description: Name of the S3 bucket to upload to.

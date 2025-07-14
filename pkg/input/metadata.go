@@ -40,12 +40,6 @@ func ParseMetadataFromEnv() (PipelineMetadata, error) {
 			schemas.EnvVarTargetIdentifier,
 		)
 	}
-	if metadata.TargetVersion == "" {
-		return metadata, fmt.Errorf(
-			"missing required environment variable %s",
-			schemas.EnvVarTargetVersion,
-		)
-	}
 
 	return metadata, nil
 }

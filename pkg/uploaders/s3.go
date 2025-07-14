@@ -11,6 +11,7 @@ package uploaders
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	"os"
 	"path/filepath"
 
@@ -28,6 +29,8 @@ const (
 	S3BucketParamName    = "BUCKET"
 	S3RegionParamName    = "REGION"
 	S3SubFolderParamName = "SUBFOLDER"
+
+	AWSConfigFileMountPath = "/aws/config"
 )
 
 type s3 struct{}
@@ -41,7 +44,13 @@ func (s s3) Upload(
 	bucketName := params[S3BucketParamName]
 	regionOverride := params[S3RegionParamName]
 	subFolder := params[S3SubFolderParamName]
-	cfg, err := config.LoadDefaultConfig(ctx)
+
+	var opts []func(*config.LoadOptions) error
+	if f, err := os.Stat(AWSConfigFileMountPath); err == nil && !f.IsDir() {
+		opts = append(opts, config.WithSharedConfigFiles([]string{AWSConfigFileMountPath}))
+	}
+
+	cfg, err := config.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
 		zap.L().Error("Failed to load AWS configuration", zap.Error(err))
 		return fmt.Errorf("failed to load AWS configuration: %w", err)
@@ -52,6 +61,7 @@ func (s s3) Upload(
 	}
 
 	s3Client := s3Service.NewFromConfig(cfg)
+	var merr *multierror.Error
 	for _, file := range files {
 		f, err := os.Open(filepath.Clean(file))
 		if err != nil {
@@ -76,8 +86,12 @@ func (s s3) Upload(
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("failed to upload file to S3: %w", err)
+			merr = multierror.Append(merr, fmt.Errorf("failed to upload file %s: %w", file, err))
 		}
+	}
+
+	if err := merr.ErrorOrNil(); err != nil {
+		return fmt.Errorf("failed to upload files to S3: %w", err)
 	}
 
 	return nil
