@@ -2,8 +2,6 @@ services:
   default-downloaders:
     image: "${OCULAR_IMAGE_REGISTRY:-ghcr.io}/${OCULAR_DEFAULT_DOWNLOADER_IMAGE_REPOSITORY:-crashappsec/ocular-default-downloaders}:${OCULAR_IMAGE_TAG:-local}"
     build:
-      secrets:
-        - netrc
       args:
         - "LDFLAGS=${LDFLAGS:-}"
         - "INTEGRATION=downloaders"
@@ -16,8 +14,6 @@ services:
   default-crawlers:
     image: "${OCULAR_IMAGE_REGISTRY:-ghcr.io}/${OCULAR_DEFAULT_CRAWLER_IMAGE_REPOSITORY:-crashappsec/ocular-default-crawlers}:${OCULAR_IMAGE_TAG:-local}"
     build:
-      secrets:
-        - netrc
       args:
         - "LDFLAGS=${LDFLAGS:-}"
         - "INTEGRATION=crawlers"
@@ -30,8 +26,6 @@ services:
   default-uploaders:
     image: "${OCULAR_IMAGE_REGISTRY:-ghcr.io}/${OCULAR_DEFAULT_UPLOADER_IMAGE_REPOSITORY:-crashappsec/ocular-default-uploaders}:${OCULAR_IMAGE_TAG:-local}"
     build:
-      secrets:
-        - netrc
       args:
         - "LDFLAGS=${LDFLAGS:-}"
         - "INTEGRATION=uploaders"
@@ -41,6 +35,3 @@ services:
         - linux/arm64
       tags:
         - "${OCULAR_IMAGE_REGISTRY:-ghcr.io}/${OCULAR_DEFAULT_UPLOADER_IMAGE_REPOSITORY:-crashappsec/ocular-default-uploaders}:${OCULAR_IMAGE_TAG:-local}"
-secrets:
-  netrc:
-    environment: NETRC

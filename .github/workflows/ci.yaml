@@ -8,19 +8,12 @@ on:
 permissions:
   contents: read
 
-env:
-  GOPRIVATE: github.com/crashappsec/ocular
 
 jobs:
   lint:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - name: Configure git for private modules
-        env:
-          TOKEN: ${{ secrets.OCULAR_READ_TOKEN }}
-          USER: ${{ github.repository_owner }}
-        run: git config --global url."https://${USER}:${TOKEN}@github.com".insteadOf "https://github.com"
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
@@ -35,11 +28,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - name: Configure git for private modules
-        env:
-          TOKEN: ${{ secrets.OCULAR_READ_TOKEN }}
-          USER: ${{ github.repository_owner }}
-        run: git config --global url."https://${USER}:${TOKEN}@github.com".insteadOf "https://github.com"
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version-file: 'go.mod'
@@ -59,11 +47,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - name: Configure git for private modules
-        env:
-          TOKEN: ${{ secrets.OCULAR_READ_TOKEN }}
-          USER: ${{ github.repository_owner }}
-        run: git config --global url."https://${USER}:${TOKEN}@github.com".insteadOf "https://github.com"
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version-file: 'go.mod'
