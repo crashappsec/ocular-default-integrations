@@ -74,7 +74,7 @@ func main() {
 	)
 
 	client, err := apiClient.NewClient(apiBaseURL, nil,
-		apiClient.TokenFileOpt(os.Getenv(schemas.EnvVarOcularTokenPath), time.Hour),
+		apiClient.TokenFileOpt(os.Getenv(schemas.EnvVarOcularTokenPath), time.Minute*5),
 		apiClient.WithContextName(contextName))
 	if err != nil {
 		l.Fatal("error creating API client", zap.Error(err))
