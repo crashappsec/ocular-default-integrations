@@ -38,18 +38,21 @@ func main() {
 		zap.String("target_version", targetVersion),
 	)
 
-	l.Info("starting downloader")
+	l.Info(fmt.Sprintf("starting %s downloader", targetDownloader))
 
 	ctx := context.Background()
 
+	l.Debug("creating target directory")
 	if err := os.MkdirAll(targetDir, 0o750); err != nil {
 		l.Fatal("error creating target directory", zap.Error(err))
 	}
 
 	downloaderDef, exists := downloaders.GetAllDefaults()[targetDownloader]
 	if !exists {
-		zap.L().Fatal(fmt.Sprintf("unable to find downloader with name %s", targetDownloader))
+		l.Fatal(fmt.Sprintf("unable to find downloader with name %s", targetDownloader))
 	}
+
+	l.Info("downloading target", zap.Reflect("definition", downloaderDef))
 
 	err := downloaderDef.Downloader.Download(ctx, targetIdentifier, targetVersion, targetDir)
 	if err != nil {

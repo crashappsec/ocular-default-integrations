@@ -98,29 +98,32 @@ func main() {
 
 	lastRun := time.Now()
 	for target := range queue {
+		targetL := l.With(
+			zap.String("target_identifier", target.Identifier),
+			zap.String("target_version", target.Version),
+			zap.String("target_downloader", target.Downloader),
+			zap.String("target_profile", profile),
+		)
+
 		waitRemaining := sleepDuration - time.Since(lastRun)
 		if waitRemaining < 0 {
 			waitRemaining = 0
 		}
+		targetL.Debug("sleeping before processing target", zap.Duration("remaining", waitRemaining))
 		time.Sleep(waitRemaining)
 		if downloaderOverride != "" {
 			target.Downloader = downloaderOverride
 		}
 
-		l.Debug("processing target",
-			zap.String("target", target.Identifier),
-			zap.String("downloader", target.Downloader),
-			zap.String("profile", profile),
-			zap.String("target_version", target.Version),
-		)
+		targetL.Info("processing target")
 		pipeline, err := client.CreatePipeline(ctx, profile, target)
 		if err != nil {
 			l.Error("error processing target", zap.Error(err))
 		} else {
-			l.Debug("pipeline created", zap.String("pipeline_id", pipeline.ID.String()))
+			l.Info("pipeline created", zap.String("pipeline_id", pipeline.ID.String()))
 		}
 		lastRun = time.Now()
 	}
 
-	l.Info("crawled successfully")
+	l.Info("search finished successfully")
 }
