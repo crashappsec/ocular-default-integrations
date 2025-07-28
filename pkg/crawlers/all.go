@@ -56,4 +56,16 @@ var allCrawlers = map[string]DefaultCrawler{
 			},
 		},
 	},
+	"static": {
+		Crawler: StaticList{},
+		Definition: schemas.Crawler{
+			Parameters: map[string]schemas.ParameterDefinition{
+				StaticTargetIdentifierList: {
+					Description: "List of target identifiers to crawl. Should be a JSON array of strings.",
+					Required:    true,
+				},
+			},
+			UserContainer: schemas.UserContainer{},
+		},
+	},
 }

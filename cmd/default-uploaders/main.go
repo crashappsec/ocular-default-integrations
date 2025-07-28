@@ -45,7 +45,7 @@ func main() {
 	l := zap.L().With(
 		zap.String("results_dir", resultsDir),
 		zap.String("uploader", uploaderName),
-		zap.Strings("files", files),
+		zap.Strings("file-args", files),
 	)
 
 	l.Info("starting uploader")
@@ -74,10 +74,11 @@ func main() {
 		}
 	}
 
+	l.Info("uploading files", zap.Strings("files", validatedFiles))
 	uploader := uploaderDef.Uploader
 	err = uploader.Upload(ctx, metadata, params, validatedFiles)
 	if err != nil {
-		l.Fatal("failed to upload files", zap.Strings("files", files), zap.Error(err))
+		l.Fatal("failed to upload files", zap.Strings("files", validatedFiles), zap.Error(err))
 	}
 
 	l.Info("uploaded artifacts successfully")
