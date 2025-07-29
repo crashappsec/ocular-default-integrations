@@ -1,4 +1,18 @@
 # Ocular Default Integrations Release Notes
+<!-- https://keepachangelog.com -->
+
+# [v0.1.1](https://github.com/crashappsec/ocular/releases/tag/v0.1.1) - **July 29, 2025**
+
+### Added
+
+- **Crawlers**
+  - Added a static crawler that supports crawling a static list of target identifiers, given in JSON.
+
+### Fixed
+
+- Improve logging of all default integrations to provide more context and clarity.
+- Decrease token cache time to live from 1 hour to 5 minutes to ensure more frequent updates and reduce the risk of using stale tokens.
+
 
 # [v0.1.0](https://github.com/crashappsec/ocular/releases/tag/v0.1.0) - **July 15, 2025**
 
