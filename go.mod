@@ -13,7 +13,7 @@ require (
 	github.com/google/go-github/v71 v71.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/spf13/viper v1.20.1
-	gitlab.com/gitlab-org/api/client-go v0.134.0
+	gitlab.com/gitlab-org/api/client-go v0.137.0
 	go.uber.org/zap v1.27.0
 	google.golang.org/api v0.244.0
 	gopkg.in/yaml.v3 v3.0.1
