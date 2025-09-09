@@ -17,11 +17,19 @@ import (
 	"time"
 
 	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
-	"github.com/crashappsec/ocular/pkg/schemas"
+	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/google/go-github/v71/github"
 	"github.com/hashicorp/go-multierror"
 	"go.uber.org/zap"
 )
+
+type GitHubOrg struct{}
+
+var _ Crawler = GitHubOrg{}
+
+func (GitHubOrg) GetName() string {
+	return "github"
+}
 
 /**************
  * Parameters *
@@ -31,6 +39,15 @@ const (
 	GitHubOrgsParamName = "GITHUB_ORGS"
 )
 
+func (GitHubOrg) GetParameters() map[string]v1beta1.ParameterDefinition {
+	return map[string]v1beta1.ParameterDefinition{
+		GitHubOrgsParamName: {
+			Description: "Comma-separated list of GitLab groups to crawl.",
+			Required:    true,
+		},
+	}
+}
+
 /************
  * Secrets  *
  ************/
@@ -38,8 +55,6 @@ const (
 const (
 	GitHubTokenSecretEnvVar = "GITLAB_TOKEN"
 )
-
-type GitHubOrg struct{}
 
 // Crawl retrieves all repositories from a specified GitHub organization
 // and sends their clone URLs to the provided queue channel. By default, the downloader
@@ -49,12 +64,12 @@ type GitHubOrg struct{}
 func (GitHubOrg) Crawl(
 	ctx context.Context,
 	params map[string]string,
-	queue chan schemas.Target,
+	queue chan CrawledTarget,
 ) error {
 	// retrieve params
 	orgs := strings.Split(params[GitHubOrgsParamName], ",")
 	token := os.Getenv(GitHubTokenSecretEnvVar)
-	downloader := downloaders.GitDownloaderName
+	downloader := downloaders.Git{}.GetName()
 
 	client := github.NewClient(nil)
 	if token != "" {
@@ -79,7 +94,7 @@ func crawlOrg(
 	ctx context.Context,
 	c *github.Client,
 	org, dl string,
-	queue chan schemas.Target,
+	queue chan CrawledTarget,
 ) error {
 	// check if org is org or user
 	user, _, err := c.Users.Get(ctx, org)
@@ -113,9 +128,11 @@ func crawlOrg(
 		}
 
 		for _, repo := range repos {
-			queue <- schemas.Target{
-				Identifier: repo.GetCloneURL(),
-				Downloader: dl,
+			queue <- CrawledTarget{
+				Target: v1beta1.Target{
+					Identifier: repo.GetCloneURL(),
+				},
+				DefaultDownloader: dl,
 			}
 		}
 		if resp.NextPage == 0 {

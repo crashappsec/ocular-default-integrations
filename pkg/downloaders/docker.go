@@ -26,6 +26,12 @@ var shaRegex = regexp.MustCompile(`^[a-f0-9]{40}$`)
 
 type docker struct{}
 
+var _ Downloader = docker{}
+
+func (docker) GetName() string {
+	return "docker"
+}
+
 func (docker) Download(ctx context.Context, dockerImage, tag, targetDir string) error {
 	var fullImage string
 	if shaRegex.MatchString(tag) {

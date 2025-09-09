@@ -1,9 +1,0 @@
-image: ghcr.io/crashappsec/ocular-default-uploaders:latest
-parameters:
-    METHOD:
-        description: The HTTP method to use for the webhook request. Defaults to PUT.
-        required: false
-        default: PUT
-    URL:
-        description: URL of the webhook to send data to.
-        required: true

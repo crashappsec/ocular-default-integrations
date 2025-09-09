@@ -23,6 +23,12 @@ import (
 
 type gcs struct{}
 
+var _ Downloader = gcs{}
+
+func (gcs) GetName() string {
+	return "gcs"
+}
+
 func (gcs) Download(ctx context.Context, bucketName, _, targetDir string) error {
 	client, err := storage.NewClient(ctx)
 	if err != nil {

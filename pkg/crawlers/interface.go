@@ -11,49 +11,88 @@ package crawlers
 import (
 	"context"
 
-	"github.com/crashappsec/ocular/pkg/schemas"
+	"github.com/crashappsec/ocular/api/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetAllDefaults() map[string]DefaultCrawler {
-	result := make(map[string]DefaultCrawler, len(allCrawlers))
-	for name, def := range allCrawlers {
-		for paramName, paramDef := range defaultParameters {
-			if _, exists := def.Definition.Parameters[paramName]; !exists {
-				def.Definition.Parameters[paramName] = paramDef
-			}
-		}
-		result[name] = def
-	}
-	return result
+// CrawledTarget represents a target that has been crawled that should have a pipeline run created for it.
+// It includes the target itself and the default downloader to use for it (if not overridden setting
+// the Downloader parameter).
+type CrawledTarget struct {
+	Target            v1beta1.Target
+	DefaultDownloader string
 }
 
-type Crawler interface {
-	Crawl(ctx context.Context, params map[string]string, queue chan schemas.Target) error
-}
-
-type DefaultCrawler struct {
-	Definition schemas.Crawler
-	Crawler    Crawler `json:"crawler"`
+var AllCrawlers = []Crawler{
+	GitHubOrg{},
+	GitLab{},
+	StaticList{},
 }
 
 const (
-	ProfileParamName       = "PROFILE"
-	SleepDurationParamName = "SLEEP_DURATION"
-	DownloaderParamName    = "DOWNLOADER"
+	ProfileParamName            = "PROFILE"
+	SleepDurationParamName      = "SLEEP_DURATION"
+	SleepDurationDefaultValue   = "1m"
+	PipelineTTLParamName        = "PIPELINE_TTL"
+	PipelineTTLDefaultValue     = "168h" // 7 days
+	DownloaderOverrideParamName = "DOWNLOADER_OVERRIDE"
 )
 
-var defaultParameters = map[string]schemas.ParameterDefinition{
+var DefaultParameters = map[string]v1beta1.ParameterDefinition{
 	ProfileParamName: {
-		Description: "Profile to use for the crawler.",
+		Description: "Profile to use for the pipelines created from this crawler.",
 		Required:    true,
 	},
 	SleepDurationParamName: {
 		Description: "Duration to sleep between requests. Will be parsed as a time.Duration.",
 		Required:    false,
-		Default:     "1m",
+		Default:     SleepDurationDefaultValue,
 	},
-	DownloaderParamName: {
-		Description: "Override the downloader for the crawler. The default will be chosen based on the crawler type.",
+	PipelineTTLParamName: {
+		Description: "TTL for the pipelines created by this crawler. Will be parsed as a time.Duration.",
+		Required:    false,
+		Default:     PipelineTTLDefaultValue, // 7 days
+	},
+	DownloaderOverrideParamName: {
+		Description: "Override the downloader for the crawler. By default, it will be chosen based on the crawler type.",
 		Required:    false,
 	},
+}
+
+type Crawler interface {
+	GetParameters() map[string]v1beta1.ParameterDefinition
+	GetName() string
+	Crawl(ctx context.Context, params map[string]string, queue chan CrawledTarget) error
+}
+
+func GenerateObjects(image string) []*v1beta1.Crawler {
+	var crawlers []*v1beta1.Crawler
+	for _, c := range AllCrawlers {
+		params := c.GetParameters()
+		// add default parameters to the crawler parameters if they don't already exist
+		// this allows us to have common parameters across all crawlers, but crawlers can override them if needed
+		for k, v := range DefaultParameters {
+			if _, ok := params[k]; !ok {
+				params[k] = v
+			}
+		}
+		crawlers = append(crawlers, &v1beta1.Crawler{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: v1beta1.SchemeGroupVersion.String(),
+				Kind:       "Crawler",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: c.GetName(),
+			},
+			Spec: v1beta1.CrawlerSpec{
+				Container: corev1.Container{
+					Name:  c.GetName(),
+					Image: image,
+				},
+				Parameters: params,
+			},
+		})
+	}
+	return crawlers
 }

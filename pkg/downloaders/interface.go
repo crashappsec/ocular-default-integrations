@@ -11,22 +11,43 @@ package downloaders
 import (
 	"context"
 
-	"github.com/crashappsec/ocular/pkg/schemas"
+	"github.com/crashappsec/ocular/api/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var AllDownloaders = []Downloader{
+	Git{},
+	docker{},
+	gcs{},
+	npm{},
+	pypi{},
+	s3{},
+}
+
 type Downloader interface {
+	GetName() string
 	Download(ctx context.Context, cloneURL, version, targetDir string) error
 }
 
-type DefaultDownloader struct {
-	Definition schemas.Downloader
-	Downloader Downloader
-}
-
-func GetAllDefaults() map[string]DefaultDownloader {
-	result := make(map[string]DefaultDownloader, len(allDownloaders))
-	for name, def := range allDownloaders {
-		result[name] = def
+func GenerateObjects(image string) []*v1beta1.Downloader {
+	var downloaders []*v1beta1.Downloader
+	for _, c := range AllDownloaders {
+		downloaders = append(downloaders, &v1beta1.Downloader{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: v1beta1.SchemeGroupVersion.String(),
+				Kind:       "Downloader",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: c.GetName(),
+			},
+			Spec: v1beta1.DownloaderSpec{
+				Container: corev1.Container{
+					Name:  c.GetName(),
+					Image: image,
+				},
+			},
+		})
 	}
-	return result
+	return downloaders
 }

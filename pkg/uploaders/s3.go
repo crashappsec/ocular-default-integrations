@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	s3Service "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
+	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
 	"go.uber.org/zap"
 )
@@ -34,6 +35,31 @@ const (
 )
 
 type s3 struct{}
+
+func (s s3) GetName() string {
+	return "s3"
+}
+
+func (s s3) GetParameters() map[string]v1beta1.ParameterDefinition {
+	return map[string]v1beta1.ParameterDefinition{
+		S3BucketParamName: {
+			Description: "Name of the S3 bucket to upload to.",
+			Required:    true,
+		},
+		S3RegionParamName: {
+			Description: "AWS region of the S3 bucket. Defaults to the region configured in the AWS SDK.",
+			Required:    false,
+			Default:     "",
+		},
+		S3SubFolderParamName: {
+			Description: "Subfolder in the S3 bucket to upload files to. Defaults to the root of the bucket.",
+			Required:    false,
+			Default:     "",
+		},
+	}
+}
+
+var _ Uploader = s3{}
 
 func (s s3) Upload(
 	ctx context.Context,

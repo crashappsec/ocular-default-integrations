@@ -34,6 +34,12 @@ type PyPIMetadata struct {
 
 type pypi struct{}
 
+var _ Downloader = pypi{}
+
+func (pypi) GetName() string {
+	return "pypi"
+}
+
 func (pypi) Download(ctx context.Context, packageName, version, targetDir string) error {
 	// Construct the URL for the PyPI JSON API
 	apiURL := fmt.Sprintf("https://pypi.org/pypi/%s/json", packageName)

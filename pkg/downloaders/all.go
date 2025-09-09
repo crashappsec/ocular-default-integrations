@@ -8,82 +8,71 @@
 
 package downloaders
 
-import "github.com/crashappsec/ocular/pkg/schemas"
-
-const (
-	GitDownloaderName    = "git"
-	DockerDownloaderName = "docker"
-	PyPiDownloaderName   = "pypi"
-	NpmDownloaderName    = "npm"
-	GcsDownloaderName    = "gcs"
-	S3DownloaderName     = "s3"
-)
-
-var allDownloaders = map[string]DefaultDownloader{
-	GitDownloaderName: {
-		Downloader: git{},
-		Definition: schemas.Downloader{
-			Secrets: []schemas.SecretRef{
-				{
-					Name:        "downloader-gitconfig",
-					MountType:   schemas.SecretMountTypeFile,
-					MountTarget: "/etc/gitconfig",
-				},
-			},
-		},
-	},
-	DockerDownloaderName: {
-		Downloader: docker{},
-		Definition: schemas.Downloader{
-			Secrets: []schemas.SecretRef{
-				{
-					Name:        "downloader-dockerconfig",
-					MountType:   schemas.SecretMountTypeFile,
-					MountTarget: "/etc/docker/config.json",
-				},
-			},
-			Env: []schemas.EnvVar{
-				{
-					Name:  "DOCKER_CONFIG",
-					Value: "/etc/docker",
-				},
-			},
-		},
-	},
-	PyPiDownloaderName: {
-		Downloader: pypi{},
-	},
-	NpmDownloaderName: {
-		Downloader: npm{},
-	},
-	GcsDownloaderName: {
-		Downloader: gcs{},
-		Definition: schemas.Downloader{
-			Secrets: []schemas.SecretRef{
-				{
-					Name:        "downloader-gcs-credentials",
-					MountType:   schemas.SecretMountTypeFile,
-					MountTarget: "GOOGLE_APPLICATION_CREDENTIALS",
-				},
-			},
-		},
-	},
-	S3DownloaderName: {
-		Downloader: s3{},
-		Definition: schemas.Downloader{
-			Secrets: []schemas.SecretRef{
-				{
-					Name:        "downloader-aws-config",
-					MountType:   schemas.SecretMountTypeFile,
-					MountTarget: "/etc/aws/config",
-				},
-			},
-			Env: []schemas.EnvVar{
-				{
-					Name:  "AWS_CONFIG_FILE",
-					Value: "/etc/aws/config",
-				},
-			},
-		},
-	},
-}
+// var allDownloaders = map[string]DefaultDownloader{
+//	GitDownloaderName: {
+//		Downloader: Git{},
+//		Definition: schemas.Downloader{
+//			Secrets: []schemas.SecretRef{
+//				{
+//					Name:        "downloader-gitconfig",
+//					MountType:   schemas.SecretMountTypeFile,
+//					MountTarget: "/etc/gitconfig",
+//				},
+//			},
+//		},
+//	},
+//	DockerDownloaderName: {
+//		Downloader: docker{},
+//		Definition: schemas.Downloader{
+//			Secrets: []schemas.SecretRef{
+//				{
+//					Name:        "downloader-dockerconfig",
+//					MountType:   schemas.SecretMountTypeFile,
+//					MountTarget: "/etc/docker/config.json",
+//				},
+//			},
+//			Env: []schemas.EnvVar{
+//				{
+//					Name:  "DOCKER_CONFIG",
+//					Value: "/etc/docker",
+//				},
+//			},
+//		},
+//	},
+//	PyPiDownloaderName: {
+//		Downloader: pypi{},
+//	},
+//	NpmDownloaderName: {
+//		Downloader: npm{},
+//	},
+//	GcsDownloaderName: {
+//		Downloader: gcs{},
+//		Definition: schemas.Downloader{
+//			Secrets: []schemas.SecretRef{
+//				{
+//					Name:        "downloader-gcs-credentials",
+//					MountType:   schemas.SecretMountTypeFile,
+//					MountTarget: "GOOGLE_APPLICATION_CREDENTIALS",
+//				},
+//			},
+//		},
+//	},
+//	S3DownloaderName: {
+//		Downloader: s3{},
+//		Definition: schemas.Downloader{
+//			Secrets: []schemas.SecretRef{
+//				{
+//					Name:        "downloader-aws-config",
+//					MountType:   schemas.SecretMountTypeFile,
+//					MountTarget: "/etc/aws/config",
+//				},
+//			},
+//			Env: []schemas.EnvVar{
+//				{
+//					Name:  "AWS_CONFIG_FILE",
+//					Value: "/etc/aws/config",
+//				},
+//			},
+//		},
+//	},
+// }

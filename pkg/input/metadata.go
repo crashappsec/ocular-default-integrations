@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/crashappsec/ocular/pkg/schemas"
+	"github.com/crashappsec/ocular/api/v1beta1"
 )
 
 type PipelineMetadata struct {
@@ -23,21 +23,21 @@ type PipelineMetadata struct {
 
 func ParseMetadataFromEnv() (PipelineMetadata, error) {
 	metadata := PipelineMetadata{
-		ID:               os.Getenv(schemas.EnvVarPipelineID),
-		TargetIdentifier: os.Getenv(schemas.EnvVarTargetIdentifier),
-		TargetVersion:    os.Getenv(schemas.EnvVarTargetVersion),
+		ID:               os.Getenv(v1beta1.EnvVarPipelineName),
+		TargetIdentifier: os.Getenv(v1beta1.EnvVarTargetIdentifier),
+		TargetVersion:    os.Getenv(v1beta1.EnvVarTargetVersion),
 	}
 
 	if metadata.ID == "" {
 		return metadata, fmt.Errorf(
 			"missing required environment variable %s",
-			schemas.EnvVarPipelineID,
+			v1beta1.EnvVarPipelineName,
 		)
 	}
 	if metadata.TargetIdentifier == "" {
 		return metadata, fmt.Errorf(
 			"missing required environment variable %s",
-			schemas.EnvVarTargetIdentifier,
+			v1beta1.EnvVarTargetIdentifier,
 		)
 	}
 

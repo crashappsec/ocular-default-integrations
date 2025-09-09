@@ -8,61 +8,59 @@
 
 package uploaders
 
-import "github.com/crashappsec/ocular/pkg/schemas"
-
-var allUploaders = map[string]DefaultUploader{
-	"s3": {
-		Definition: schemas.Uploader{
-			Parameters: map[string]schemas.ParameterDefinition{
-				S3BucketParamName: {
-					Description: "Name of the S3 bucket to upload to.",
-					Required:    true,
-				},
-				S3RegionParamName: {
-					Description: "AWS region of the S3 bucket. Defaults to the region configured in the AWS SDK.",
-					Required:    false,
-					Default:     "",
-				},
-				S3SubFolderParamName: {
-					Description: "Subfolder in the S3 bucket to upload files to. Defaults to the root of the bucket.",
-					Required:    false,
-					Default:     "",
-				},
-			},
-			UserContainer: schemas.UserContainer{
-				Secrets: []schemas.SecretRef{
-					{
-						Name:        "uploader-awsconfig",
-						MountTarget: AWSConfigFileMountPath,
-						MountType:   schemas.SecretMountTypeFile,
-					},
-				},
-			},
-		},
-		Uploader: s3{},
-	},
-	"webhook": {
-		Definition: schemas.Uploader{
-			Parameters: map[string]schemas.ParameterDefinition{
-				WebhookURLParamName: {
-					Description: "URL of the webhook to send data to.",
-					Required:    true,
-				},
-				WebhookMethodParamName: {
-					Description: "The HTTP method to use for the webhook request. Defaults to PUT.",
-					Required:    false,
-					Default:     "PUT",
-				},
-			},
-		},
-		Uploader: webhook{},
-	},
-}
-
-func GetAllDefaults() map[string]DefaultUploader {
-	result := make(map[string]DefaultUploader, len(allUploaders))
-	for name, def := range allUploaders {
-		result[name] = def
-	}
-	return result
-}
+// var allUploaders = map[string]DefaultUploader{
+//	"s3": {
+//		Definition: v1.Uploader{
+//			Parameters: map[string]v1.ParameterDefinition{
+//				S3BucketParamName: {
+//					Description: "Name of the S3 bucket to upload to.",
+//					Required:    true,
+//				},
+//				S3RegionParamName: {
+//					Description: "AWS region of the S3 bucket. Defaults to the region configured in the AWS SDK.",
+//					Required:    false,
+//					Default:     "",
+//				},
+//				S3SubFolderParamName: {
+//					Description: "Subfolder in the S3 bucket to upload files to. Defaults to the root of the bucket.",
+//					Required:    false,
+//					Default:     "",
+//				},
+//			},
+//			UserContainer: schemas.UserContainer{
+//				Secrets: []schemas.SecretRef{
+//					{
+//						Name:        "uploader-awsconfig",
+//						MountTarget: AWSConfigFileMountPath,
+//						MountType:   schemas.SecretMountTypeFile,
+//					},
+//				},
+//			},
+//		},
+//		Uploader: s3{},
+//	},
+//	"webhook": {
+//		Definition: schemas.Uploader{
+//			Parameters: map[string]schemas.ParameterDefinition{
+//				WebhookURLParamName: {
+//					Description: "URL of the webhook to send data to.",
+//					Required:    true,
+//				},
+//				WebhookMethodParamName: {
+//					Description: "The HTTP method to use for the webhook request. Defaults to PUT.",
+//					Required:    false,
+//					Default:     "PUT",
+//				},
+//			},
+//		},
+//		Uploader: webhook{},
+//	},
+// }
+//
+// func GetAllDefaults() map[string]DefaultUploader {
+//	result := make(map[string]DefaultUploader, len(allUploaders))
+//	for name, def := range allUploaders {
+//		result[name] = def
+//	}
+//	return result
+// }

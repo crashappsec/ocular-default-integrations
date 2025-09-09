@@ -12,26 +12,28 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"os"
 
-	"github.com/crashappsec/ocular-default-integrations/internal/config"
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
 	"github.com/crashappsec/ocular-default-integrations/pkg/uploaders"
-	"github.com/crashappsec/ocular/pkg/schemas"
-	"go.uber.org/zap"
+	"github.com/crashappsec/ocular/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-func init() {
-	config.Init()
-}
-
 func main() {
-	resultsDir := os.Getenv(schemas.EnvVarResultsDir)
-	uploaderName := os.Getenv(schemas.EnvVarUploaderName)
-	metadata, err := input.ParseMetadataFromEnv()
-	if err != nil {
-		zap.L().Fatal("failed to parse metadata from environment", zap.Error(err))
-	}
+	ctx := context.Background()
+	opts := zap.Options{}
+	opts.BindFlags(flag.CommandLine)
+	flag.Parse()
+
+	logger := zap.New(zap.UseFlagOptions(&zap.Options{}))
+	log.SetLogger(logger)
+	ctx = log.IntoContext(ctx, logger)
+
+	logger.Info("starting crawler")
 
 	var files []string
 	for i, arg := range os.Args {
@@ -41,44 +43,66 @@ func main() {
 			break
 		}
 	}
+	resultsDir := os.Getenv(v1beta1.EnvVarResultsDir)
 
-	l := zap.L().With(
-		zap.String("results_dir", resultsDir),
-		zap.String("uploader", uploaderName),
-		zap.Strings("file-args", files),
+	uploaderName := os.Getenv(v1beta1.EnvVarUploaderName)
+	if uploaderName == "" {
+		logger.Error(
+			fmt.Errorf("%s environment variable not set", v1beta1.EnvVarUploaderName),
+			"no uploader specified",
+		)
+		os.Exit(1)
+	}
+
+	l := logger.WithValues(
+		"results_dir", resultsDir,
+		"uploader", uploaderName,
+		"file-args", files,
 	)
+
+	metadata, err := input.ParseMetadataFromEnv()
+	if err != nil {
+		logger.Error(err, "failed to parse metadata from environment")
+		os.Exit(1)
+	}
 
 	l.Info("starting uploader")
 
-	ctx := context.Background()
-
-	uploaderDef, exists := uploaders.GetAllDefaults()[uploaderName]
-	if !exists {
-		l.Fatal("unknown uploader", zap.String("uploader", uploaderName))
+	var uploader uploaders.Uploader
+	for _, u := range uploaders.AllUploaders {
+		if u.GetName() == uploaderName {
+			uploader = u
+			break
+		}
 	}
 
-	params, err := input.ParseParamsFromEnv(uploaderDef.Definition.Parameters)
+	if uploader == nil {
+		logger.Error(fmt.Errorf("unknown uploader %s", uploaderName), "no valid uploader specified")
+		os.Exit(1)
+	}
+
+	params, err := input.ParseParamsFromEnv(uploader.GetParameters())
 	if err != nil {
-		l.Fatal("failed to parse parameters from environment", zap.Error(err))
+		logger.Error(err, "unable to parse parameters from environment")
 	}
 
 	var validatedFiles []string
 	for _, file := range files {
-		l.Debug("validating file exists", zap.String("file", file))
+		l.Info("validating file exists", "file", file)
 		if _, err := os.Stat(file); os.IsNotExist(err) {
-			l.Warn("file does not exist, skipping", zap.String("file", file))
+			logger.Info("file does not exist, skipping", "file", file)
 		} else if err != nil {
-			l.Warn("unable to stat file, skipping", zap.String("file", file), zap.Error(err))
+			logger.Error(err, "unable to stat file, skipping", "file", file)
 		} else {
 			validatedFiles = append(validatedFiles, file)
 		}
 	}
 
-	l.Info("uploading files", zap.Strings("files", validatedFiles))
-	uploader := uploaderDef.Uploader
+	l.Info("uploading files", "files", validatedFiles)
 	err = uploader.Upload(ctx, metadata, params, validatedFiles)
 	if err != nil {
-		l.Fatal("failed to upload files", zap.Strings("files", validatedFiles), zap.Error(err))
+		l.Error(err, "failed to upload files", "files", validatedFiles)
+		os.Exit(1)
 	}
 
 	l.Info("uploaded artifacts successfully")

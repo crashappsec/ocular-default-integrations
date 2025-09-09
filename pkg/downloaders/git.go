@@ -21,9 +21,15 @@ import (
 	"go.uber.org/zap"
 )
 
-type git struct{}
+type Git struct{}
 
-func (git) Download(ctx context.Context, cloneURL, version, targetDir string) error {
+var _ Downloader = Git{}
+
+func (Git) GetName() string {
+	return "git"
+}
+
+func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) error {
 	l := zap.L().With(zap.String("cloneURL", cloneURL), zap.String("targetDir", targetDir))
 
 	// Initialize empty local repo
@@ -76,19 +82,19 @@ func (git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 		return fmt.Errorf("failed to fetch repository: %w", err)
 	}
 
-	l.Debug("cloned git repository")
+	l.Debug("cloned Git repository")
 
 	var checkoutOptions *gogit.CheckoutOptions
 	switch {
 	case version == "":
 		ref, err := repo.Reference(plumbing.NewRemoteHEADReferenceName("origin"), true)
 		if err != nil {
-			l.Error("failed to resolve git HEAD ref, defaulting to main", zap.Error(err))
+			l.Error("failed to resolve Git HEAD ref, defaulting to main", zap.Error(err))
 			checkoutOptions = &gogit.CheckoutOptions{
 				Branch: plumbing.NewRemoteReferenceName("origin", "main"),
 			}
 		} else {
-			l.Debug("resolved git HEAD ref", zap.String("ref", ref.Name().String()))
+			l.Debug("resolved Git HEAD ref", zap.String("ref", ref.Name().String()))
 			checkoutOptions = &gogit.CheckoutOptions{
 				Branch: ref.Name(),
 			}

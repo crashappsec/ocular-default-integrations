@@ -12,18 +12,18 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/crashappsec/ocular/pkg/schemas"
+	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
 )
 
 func ParseParamsFromEnv(
-	definitions map[string]schemas.ParameterDefinition,
+	definitions map[string]v1beta1.ParameterDefinition,
 ) (map[string]string, error) {
 	params := make(map[string]string)
 
 	var merr *multierror.Error
 	for name, def := range definitions {
-		envValue, exists := os.LookupEnv(schemas.ParameterNameToEnv(name))
+		envValue, exists := os.LookupEnv(v1beta1.ParameterToEnvironmentVariable(name))
 		if def.Required && !exists {
 			merr = multierror.Append(merr, fmt.Errorf("parameter %s is required", name))
 			continue

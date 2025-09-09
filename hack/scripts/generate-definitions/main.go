@@ -14,19 +14,29 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/crashappsec/ocular-default-integrations/internal/config"
 	"github.com/crashappsec/ocular-default-integrations/pkg/crawlers"
 	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
 	"github.com/crashappsec/ocular-default-integrations/pkg/uploaders"
-	"github.com/crashappsec/ocular/pkg/schemas"
+	"github.com/crashappsec/ocular/api/v1beta1"
+	"github.com/hashicorp/go-multierror"
 	"go.uber.org/zap"
-	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
-	// 	imageTag string is the docker image tag of the images
-	imageTag string
+	// 	crawlerImage is the docker image tag of the default crawlers
+	crawlersImage string
+	// uploaderImage is the docker image tag of the default uploaders
+	uploadersImage string
+	// downloaderImage is the docker image tag of the default downloaders
+	downloadersImage string
+
+	// imagesTag is the tag to use for all images
+	imagesTag string
+
 	// outputFolder is the folder to write results to.
 	// A folder for each of the resource types with defaults (uploader, downloader, crawler)
 	// will be created with each default definition being a `.yaml` file with the same name
@@ -35,12 +45,32 @@ var (
 )
 
 func init() {
-	flag.StringVar(&imageTag, "image-tag", "latest", "override the tag of the docker images")
-	flag.StringVar(&outputFolder, "output-folder", "", "set the output directory (required)")
-	config.InitLogger(os.Getenv("OCULAR_LOGGING_LEVEL"), os.Getenv("OCULAR_LOGGING_FORMAT"))
+	flag.StringVar(
+		&crawlersImage,
+		"crawlers-image",
+		"ghcr.io/crashappsec/ocular-default-crawlers",
+		"the image to use for the default crawlers",
+	)
+	flag.StringVar(
+		&downloadersImage,
+		"downloaders-image",
+		"ghcr.io/crashappsec/ocular-default-downloaders",
+		"the image to use for the default downloaders",
+	)
+	flag.StringVar(
+		&uploadersImage,
+		"uploaders-image",
+		"ghcr.io/crashappsec/ocular-default-uploaders",
+		"the image to use for the default uploaders",
+	)
+	flag.StringVar(&imagesTag, "images-tag", "latest", "the tag to use for all images")
+
+	flag.StringVar(&outputFolder, "output-folder", "config", "set the output directory (required)")
 }
 
 func main() {
+	l, _ := zap.NewDevelopment()
+	zap.ReplaceGlobals(l)
 	zap.L().Info("generating definitions")
 	flag.Parse()
 
@@ -60,98 +90,62 @@ func main() {
 		zap.L().Fatal("--output-folder could not be created", zap.Error(err))
 	}
 
-	downloaders := generateDownloaderDefinitions(imageTag)
-	downloaderFolder := filepath.Join(outputFolder, "downloaders")
-	if err = os.MkdirAll(downloaderFolder, 0o750); err != nil {
-		zap.L().Fatal("downloader folder could not be created", zap.Error(err))
+	downloaderImageStub := "default-downloaders:latest"
+	downloaders := downloaders.GenerateObjects(downloaderImageStub)
+	if err = createResourceKustomizeFolder[*v1beta1.Downloader]("Downloaders", downloaders); err != nil {
+		zap.L().Fatal("error creating downloader kustomize folder", zap.Error(err))
 	}
-	for name, downloader := range downloaders {
+
+	crawlerImageStub := "default-crawlers:latest"
+	crawlers := crawlers.GenerateObjects(crawlerImageStub)
+	if err = createResourceKustomizeFolder[*v1beta1.Crawler]("Crawlers", crawlers); err != nil {
+		zap.L().Fatal("error creating crawler kustomize folder", zap.Error(err))
+	}
+
+	uploaderImageStub := "default-uploaders:latest"
+	uploaders := uploaders.GenerateObjects(uploaderImageStub)
+	if err = createResourceKustomizeFolder[*v1beta1.Uploader]("Uploaders", uploaders); err != nil {
+		zap.L().Fatal("error creating uploader kustomize folder", zap.Error(err))
+	}
+}
+
+func createResourceKustomizeFolder[T client.Object](kind string, resources []T) error {
+	kindLower := strings.ToLower(kind)
+	kindFolder := filepath.Join(outputFolder, kindLower)
+	if err := os.MkdirAll(kindFolder, 0o750); err != nil {
+		zap.L().
+			Fatal("resource folder could not be created", zap.Error(err), zap.String("kind", kind))
+	}
+
+	var merr *multierror.Error
+	for _, resource := range resources {
+		filename := fmt.Sprintf("%s.yaml", resource.GetName())
 		file, err := os.Create(
-			filepath.Clean(filepath.Join(downloaderFolder, fmt.Sprintf("%s.yaml", name))),
+			filepath.Clean(filepath.Join(kindFolder, filename)),
 		)
 		if err != nil {
 			zap.L().
-				Error("error creating downloader", zap.Error(err), zap.String("downloader", name))
-			continue
+				Error("error creating resource", zap.Error(err), zap.String("kind", kind), zap.String("resource", resource.GetName()))
+			merr = multierror.Append(merr, err)
 		}
 
-		if err = yaml.NewEncoder(file).Encode(downloader); err != nil {
+		e := json.NewSerializerWithOptions(
+			json.DefaultMetaFactory,
+			nil,
+			nil,
+			json.SerializerOptions{Yaml: true, Pretty: true, Strict: false},
+		)
+		if err = e.Encode(resource, file); err != nil {
 			zap.L().
-				Error("error encoding downloader", zap.Error(err), zap.String("downloader", name))
+				Error("error printing resource", zap.Error(err), zap.String("kind", kind), zap.String("resource", resource.GetName()))
+			merr = multierror.Append(merr, err)
 		}
 
 		_ = file.Close()
 	}
 
-	crawlers := generateCrawlerDefinitions(imageTag)
-	crawlerFolder := filepath.Join(outputFolder, "crawlers")
-	if err = os.MkdirAll(crawlerFolder, 0o750); err != nil {
-		zap.L().Fatal("crawler folder could not be created", zap.Error(err))
+	if merr != nil {
+		return merr.ErrorOrNil()
 	}
-	for name, crawler := range crawlers {
-		file, err := os.Create(
-			filepath.Clean(filepath.Join(crawlerFolder, fmt.Sprintf("%s.yaml", name))),
-		)
-		if err != nil {
-			zap.L().Error("error creating crawler", zap.Error(err), zap.String("crawler", name))
-			continue
-		}
-
-		if err = yaml.NewEncoder(file).Encode(crawler); err != nil {
-			zap.L().Error("error encoding crawler", zap.Error(err), zap.String("crawler", name))
-		}
-
-		_ = file.Close()
-	}
-
-	uploaders := generateUploaderDefinitions(imageTag)
-	uploaderFolder := filepath.Join(outputFolder, "uploaders")
-	if err = os.MkdirAll(uploaderFolder, 0o750); err != nil {
-		zap.L().Fatal("uploader folder could not be created", zap.Error(err))
-	}
-	for name, uploader := range uploaders {
-		file, err := os.Create(
-			filepath.Clean(filepath.Join(uploaderFolder, fmt.Sprintf("%s.yaml", name))),
-		)
-		if err != nil {
-			zap.L().Error("error creating uploader", zap.Error(err), zap.String("uploader", name))
-			continue
-		}
-
-		if err = yaml.NewEncoder(file).Encode(uploader); err != nil {
-			zap.L().Error("error encoding uploader", zap.Error(err), zap.String("uploader", name))
-		}
-
-		_ = file.Close()
-	}
-}
-
-func generateDownloaderDefinitions(imageTag string) map[string]schemas.Downloader {
-	result := make(map[string]schemas.Downloader)
-	for downloader, spec := range downloaders.GetAllDefaults() {
-		def := spec.Definition
-		def.Image = "ghcr.io/crashappsec/ocular-default-downloaders:" + imageTag
-		result[downloader] = def
-	}
-	return result
-}
-
-func generateCrawlerDefinitions(imageTag string) map[string]schemas.Crawler {
-	result := make(map[string]schemas.Crawler)
-	for downloader, spec := range crawlers.GetAllDefaults() {
-		def := spec.Definition
-		def.Image = "ghcr.io/crashappsec/ocular-default-crawlers:" + imageTag
-		result[downloader] = def
-	}
-	return result
-}
-
-func generateUploaderDefinitions(imageTag string) map[string]schemas.Uploader {
-	result := make(map[string]schemas.Uploader)
-	for downloader, spec := range uploaders.GetAllDefaults() {
-		def := spec.Definition
-		def.Image = "ghcr.io/crashappsec/ocular-default-uploaders:" + imageTag
-		result[downloader] = def
-	}
-	return result
+	return nil
 }

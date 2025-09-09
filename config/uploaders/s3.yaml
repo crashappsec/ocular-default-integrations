@@ -1,0 +1,22 @@
+apiVersion: ocular.crashoverride.run/v1beta1
+kind: Uploader
+metadata:
+  name: s3
+spec:
+  container:
+    image: default-uploaders:latest
+    name: s3
+    resources: {}
+  parameters:
+    BUCKET:
+      description: Name of the S3 bucket to upload to.
+      required: true
+    REGION:
+      description: AWS region of the S3 bucket. Defaults to the region configured
+        in the AWS SDK.
+      required: false
+    SUBFOLDER:
+      description: Subfolder in the S3 bucket to upload files to. Defaults to the
+        root of the bucket.
+      required: false
+status: {}

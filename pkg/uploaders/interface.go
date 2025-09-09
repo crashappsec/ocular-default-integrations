@@ -12,10 +12,19 @@ import (
 	"context"
 
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
-	"github.com/crashappsec/ocular/pkg/schemas"
+	"github.com/crashappsec/ocular/api/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var AllUploaders = []Uploader{
+	s3{},
+	webhook{},
+}
+
 type Uploader interface {
+	GetParameters() map[string]v1beta1.ParameterDefinition
+	GetName() string
 	Upload(
 		ctx context.Context,
 		metadata input.PipelineMetadata,
@@ -24,7 +33,26 @@ type Uploader interface {
 	) error
 }
 
-type DefaultUploader struct {
-	Definition schemas.Uploader
-	Uploader   Uploader `json:"uploader"`
+func GenerateObjects(image string) []*v1beta1.Uploader {
+	var uploaders []*v1beta1.Uploader
+	for _, c := range AllUploaders {
+		params := c.GetParameters()
+		uploaders = append(uploaders, &v1beta1.Uploader{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: v1beta1.SchemeGroupVersion.String(),
+				Kind:       "Uploader",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: c.GetName(),
+			},
+			Spec: v1beta1.UploaderSpec{
+				Container: corev1.Container{
+					Name:  c.GetName(),
+					Image: image,
+				},
+				Parameters: params,
+			},
+		})
+	}
+	return uploaders
 }

@@ -17,13 +17,19 @@ import (
 	"time"
 
 	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
-	"github.com/crashappsec/ocular/pkg/schemas"
+	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/zap"
 )
 
 type GitLab struct{}
+
+func (g GitLab) GetName() string {
+	return "gitlab"
+}
+
+var _ Crawler = GitLab{}
 
 /**************
  * Parameters *
@@ -34,6 +40,23 @@ const (
 	GitlabInstanceURLParamName     = "GITLAB_INSTANCE_URL"
 	GitlabIncludeSubgroupParamName = "INCLUDE_SUBGROUPS"
 )
+
+func (g GitLab) GetParameters() map[string]v1beta1.ParameterDefinition {
+	return map[string]v1beta1.ParameterDefinition{
+		GitLabGroupsParamName: {
+			Description: "Comma-separated list of GitLab groups to crawl. If empty, the entire instance will be crawled.",
+			Required:    false,
+		},
+		GitlabInstanceURLParamName: {
+			Description: "The base URL of the GitLab instance to crawl. For GitLab.com, use https://gitlab.com/api/v4",
+			Required:    true,
+		},
+		GitlabIncludeSubgroupParamName: {
+			Description: "If set, include projects from subgroups of the specified groups.",
+			Required:    false,
+		},
+	}
+}
 
 /************
  * Secrets  *
@@ -50,7 +73,7 @@ const (
 func (g GitLab) Crawl(
 	ctx context.Context,
 	params map[string]string,
-	queue chan schemas.Target,
+	queue chan CrawledTarget,
 ) error {
 	groups := strings.Split(params[GitLabGroupsParamName], ",")
 	token := os.Getenv(GitlabTokenSecretEnvVar)
@@ -61,8 +84,8 @@ func (g GitLab) Crawl(
 	includeSubGroup := params[GitlabIncludeSubgroupParamName] != ""
 
 	// will default to use default git downloader.
-	// This will be overridden in the main function if 'DOWNLOADER' param is set
-	downloader := downloaders.GitDownloaderName
+	// This will be overridden in the main function if 'DOWNLOADER_OVERRIDE' param is set
+	downloader := downloaders.Git{}.GetName()
 
 	l := zap.L().
 		With(zap.String("url", baseURL), zap.String("downloader", downloader), zap.Strings("groups", groups))
@@ -95,7 +118,7 @@ func crawlGitlabGroup(
 	_ context.Context,
 	c *gitlab.Client,
 	org, dl string, includeSubGroups bool,
-	queue chan schemas.Target,
+	queue chan CrawledTarget,
 ) error {
 	opt := gitlab.ListOptions{PerPage: 100}
 	for {
@@ -117,9 +140,11 @@ func crawlGitlabGroup(
 		}
 
 		for _, repo := range projs {
-			queue <- schemas.Target{
-				Identifier: repo.HTTPURLToRepo,
-				Downloader: dl,
+			queue <- CrawledTarget{
+				Target: v1beta1.Target{
+					Identifier: repo.HTTPURLToRepo,
+				},
+				DefaultDownloader: dl,
 			}
 		}
 		if resp.NextPage == 0 || resp.NextPage >= resp.TotalPages {
@@ -152,7 +177,7 @@ func crawlGitlabInstance(
 	ctx context.Context,
 	c *gitlab.Client,
 	dl string,
-	queue chan schemas.Target,
+	queue chan CrawledTarget,
 ) error {
 	opt := gitlab.ListOptions{PerPage: 100}
 	for {

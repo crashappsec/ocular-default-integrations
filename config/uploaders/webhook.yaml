@@ -1,0 +1,18 @@
+apiVersion: ocular.crashoverride.run/v1beta1
+kind: Uploader
+metadata:
+  name: webhook
+spec:
+  container:
+    image: default-uploaders:latest
+    name: webhook
+    resources: {}
+  parameters:
+    METHOD:
+      default: PUT
+      description: The HTTP method to use for the webhook request. Defaults to PUT.
+      required: false
+    URL:
+      description: URL of the webhook to send data to.
+      required: true
+status: {}

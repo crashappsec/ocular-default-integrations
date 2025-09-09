@@ -16,8 +16,17 @@ import (
 	"path/filepath"
 
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
+	"github.com/crashappsec/ocular/api/v1beta1"
 	"go.uber.org/zap"
 )
+
+type webhook struct{}
+
+var _ Uploader = webhook{}
+
+func (w webhook) GetName() string {
+	return "webhook"
+}
 
 /**************
  * Parameters *
@@ -28,7 +37,19 @@ const (
 	WebhookMethodParamName = "METHOD"
 )
 
-type webhook struct{}
+func (w webhook) GetParameters() map[string]v1beta1.ParameterDefinition {
+	return map[string]v1beta1.ParameterDefinition{
+		WebhookURLParamName: {
+			Description: "URL of the webhook to send data to.",
+			Required:    true,
+		},
+		WebhookMethodParamName: {
+			Description: "The HTTP method to use for the webhook request. Defaults to PUT.",
+			Required:    false,
+			Default:     "PUT",
+		},
+	}
+}
 
 func (w webhook) Upload(
 	ctx context.Context,

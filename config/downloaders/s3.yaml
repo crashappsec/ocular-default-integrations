@@ -1,0 +1,10 @@
+apiVersion: ocular.crashoverride.run/v1beta1
+kind: Downloader
+metadata:
+  name: s3
+spec:
+  container:
+    image: default-downloaders:latest
+    name: s3
+    resources: {}
+status: {}

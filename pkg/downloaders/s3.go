@@ -24,6 +24,12 @@ import (
 
 type s3 struct{}
 
+var _ Downloader = s3{}
+
+func (s3) GetName() string {
+	return "s3"
+}
+
 func (s3) Download(ctx context.Context, bucketName, version, targetDir string) error {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {

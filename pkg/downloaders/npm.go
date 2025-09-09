@@ -34,6 +34,12 @@ type NpmMetadata struct {
 
 type npm struct{}
 
+var _ Downloader = npm{}
+
+func (npm) GetName() string {
+	return "npm"
+}
+
 func (npm) Download(ctx context.Context, packageName, version, targetDir string) error {
 	registryURL := fmt.Sprintf("https://registry.npmjs.org/%s", packageName)
 
