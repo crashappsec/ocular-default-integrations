@@ -9,6 +9,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,9 +22,10 @@ import (
 	"github.com/crashappsec/ocular-default-integrations/pkg/uploaders"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
-	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var (
@@ -69,52 +71,67 @@ func init() {
 }
 
 func main() {
-	l, _ := zap.NewDevelopment()
-	zap.ReplaceGlobals(l)
-	zap.L().Info("generating definitions")
+	ctx := context.Background()
+
+	opts := zap.Options{}
+	opts.BindFlags(flag.CommandLine)
+	flag.Parse()
+
+	logger := zap.New(zap.UseFlagOptions(&zap.Options{}))
+	log.SetLogger(logger)
+	ctx = log.IntoContext(ctx, logger)
+	logger.Info("generating definitions")
 	flag.Parse()
 
 	if outputFolder == "" {
-		zap.L().Fatal("--output-folder is required")
+		logger.Error(fmt.Errorf("--output-folder is required"), "no output folder specified")
+		os.Exit(1)
 	}
 
 	f, err := os.Stat(outputFolder)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		zap.L().Fatal("--output-folder returned an error when checking for validity")
+		logger.Error(err, "--output-folder returned an error when checking for validity")
+		os.Exit(1)
 	}
 	if err == nil && !f.IsDir() {
-		zap.L().Fatal("--output-folder already exists is not a directory")
+		err := fmt.Errorf("--output-folder already exists is not a directory")
+		logger.Error(err, "unable to continue with output directory")
+		os.Exit(1)
 	}
 
 	if err = os.MkdirAll(outputFolder, 0o750); err != nil {
-		zap.L().Fatal("--output-folder could not be created", zap.Error(err))
+		logger.Error(err, "--output-folder could not be created")
+		os.Exit(1)
 	}
 
 	downloaderImageStub := "default-downloaders:latest"
-	downloaders := downloaders.GenerateObjects(downloaderImageStub)
-	if err = createResourceKustomizeFolder[*v1beta1.Downloader]("Downloaders", downloaders); err != nil {
-		zap.L().Fatal("error creating downloader kustomize folder", zap.Error(err))
+	downloaderObjs := downloaders.GenerateObjects(downloaderImageStub)
+	if err = createResourceKustomizeFolder[*v1beta1.Downloader](ctx, "Downloaders", downloaderObjs); err != nil {
+		logger.Error(err, "error creating downloader kustomize folder")
+		os.Exit(1)
 	}
 
 	crawlerImageStub := "default-crawlers:latest"
-	crawlers := crawlers.GenerateObjects(crawlerImageStub)
-	if err = createResourceKustomizeFolder[*v1beta1.Crawler]("Crawlers", crawlers); err != nil {
-		zap.L().Fatal("error creating crawler kustomize folder", zap.Error(err))
+	crawlerObjs := crawlers.GenerateObjects(crawlerImageStub)
+	if err = createResourceKustomizeFolder[*v1beta1.Crawler](ctx, "Crawlers", crawlerObjs); err != nil {
+		logger.Error(err, "error creating crawler kustomize folder")
+		os.Exit(1)
 	}
 
 	uploaderImageStub := "default-uploaders:latest"
-	uploaders := uploaders.GenerateObjects(uploaderImageStub)
-	if err = createResourceKustomizeFolder[*v1beta1.Uploader]("Uploaders", uploaders); err != nil {
-		zap.L().Fatal("error creating uploader kustomize folder", zap.Error(err))
+	uploaderObjs := uploaders.GenerateObjects(uploaderImageStub)
+	if err = createResourceKustomizeFolder[*v1beta1.Uploader](ctx, "Uploaders", uploaderObjs); err != nil {
+		logger.Error(err, "error creating uploader kustomize folder")
+		os.Exit(1)
 	}
 }
 
-func createResourceKustomizeFolder[T client.Object](kind string, resources []T) error {
+func createResourceKustomizeFolder[T client.Object](ctx context.Context, kind string, resources []T) error {
+	l := log.FromContext(ctx).WithValues("kind", kind, "count", len(resources))
 	kindLower := strings.ToLower(kind)
 	kindFolder := filepath.Join(outputFolder, kindLower)
 	if err := os.MkdirAll(kindFolder, 0o750); err != nil {
-		zap.L().
-			Fatal("resource folder could not be created", zap.Error(err), zap.String("kind", kind))
+		return fmt.Errorf("error creating %s folder: %w", kindLower, err)
 	}
 
 	var merr *multierror.Error
@@ -124,8 +141,7 @@ func createResourceKustomizeFolder[T client.Object](kind string, resources []T) 
 			filepath.Clean(filepath.Join(kindFolder, filename)),
 		)
 		if err != nil {
-			zap.L().
-				Error("error creating resource", zap.Error(err), zap.String("kind", kind), zap.String("resource", resource.GetName()))
+			l.Error(err, "error creating resource file", "resource", resource.GetName())
 			merr = multierror.Append(merr, err)
 		}
 
@@ -136,8 +152,7 @@ func createResourceKustomizeFolder[T client.Object](kind string, resources []T) 
 			json.SerializerOptions{Yaml: true, Pretty: true, Strict: false},
 		)
 		if err = e.Encode(resource, file); err != nil {
-			zap.L().
-				Error("error printing resource", zap.Error(err), zap.String("kind", kind), zap.String("resource", resource.GetName()))
+			l.Error(err, "error printing resource", "resource", resource.GetName())
 			merr = multierror.Append(merr, err)
 		}
 

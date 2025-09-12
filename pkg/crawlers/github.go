@@ -16,11 +16,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/google/go-github/v71/github"
 	"github.com/hashicorp/go-multierror"
-	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type GitHubOrg struct{}
@@ -31,30 +33,39 @@ func (GitHubOrg) GetName() string {
 	return "github"
 }
 
-/**************
- * Parameters *
- **************/
+const (
+	GitHubTokenSecretEnvVar = "GITHUB_TOKEN"
+)
+
+func (o GitHubOrg) GetEnvSecrets() []definitions.EnvironmentSecret {
+	return []definitions.EnvironmentSecret{
+		{
+			SecretKey:  "github-token",
+			EnvVarName: GitHubTokenSecretEnvVar,
+		},
+	}
+}
+
+func (o GitHubOrg) GetFileSecrets() []definitions.FileSecret {
+	return nil
+}
+func (o GitHubOrg) EnvironmentVariables() []corev1.EnvVar {
+	return nil
+}
 
 const (
 	GitHubOrgsParamName = "GITHUB_ORGS"
 )
 
-func (GitHubOrg) GetParameters() map[string]v1beta1.ParameterDefinition {
-	return map[string]v1beta1.ParameterDefinition{
-		GitHubOrgsParamName: {
+func (GitHubOrg) GetParameters() []v1beta1.ParameterDefinition {
+	return []v1beta1.ParameterDefinition{
+		{
+			Name:        GitHubOrgsParamName,
 			Description: "Comma-separated list of GitLab groups to crawl.",
 			Required:    true,
 		},
 	}
 }
-
-/************
- * Secrets  *
- ************/
-
-const (
-	GitHubTokenSecretEnvVar = "GITLAB_TOKEN"
-)
 
 // Crawl retrieves all repositories from a specified GitHub organization
 // and sends their clone URLs to the provided queue channel. By default, the downloader
@@ -66,6 +77,7 @@ func (GitHubOrg) Crawl(
 	params map[string]string,
 	queue chan CrawledTarget,
 ) error {
+	l := log.FromContext(ctx).WithValues("crawler", "github")
 	// retrieve params
 	orgs := strings.Split(params[GitHubOrgsParamName], ",")
 	token := os.Getenv(GitHubTokenSecretEnvVar)
@@ -82,7 +94,7 @@ func (GitHubOrg) Crawl(
 	var merr *multierror.Error
 	for _, org := range orgs {
 		if err := crawlOrg(ctx, client, org, downloader, queue); err != nil {
-			zap.L().Error("Error crawling org", zap.String("org", org), zap.Error(err))
+			l.Error(err, "Error crawling org", "org", org)
 			merr = multierror.Append(merr, err)
 		}
 	}
@@ -96,6 +108,9 @@ func crawlOrg(
 	org, dl string,
 	queue chan CrawledTarget,
 ) error {
+	l := log.FromContext(ctx)
+
+	l.Info("crawling github org", "org", org)
 	// check if org is org or user
 	user, _, err := c.Users.Get(ctx, org)
 	if err != nil {
@@ -103,7 +118,11 @@ func crawlOrg(
 	}
 
 	isOrg := user.GetType() == "Organization"
+	l = l.WithValues(
+		"org", org,
+		"org_type", user.GetType())
 
+	l.Info("beginning to crawl github repositories")
 	opt := github.ListOptions{PerPage: 100}
 	for {
 		var (
@@ -128,6 +147,7 @@ func crawlOrg(
 		}
 
 		for _, repo := range repos {
+			l.Info("enqueuing repository", "repo", repo.GetFullName(), "url", repo.GetCloneURL())
 			queue <- CrawledTarget{
 				Target: v1beta1.Target{
 					Identifier: repo.GetCloneURL(),
@@ -145,18 +165,18 @@ func crawlOrg(
 			resetTime, convertErr := strconv.Atoi(reset)
 			sleep := time.Hour
 			if convertErr != nil {
-				zap.L().
-					Error("unable to convert ratelimit reset", zap.String("reset", reset), zap.Error(convertErr))
-				zap.L().Info("using default sleep duration", zap.Duration("duration", sleep))
+				l.
+					Error(convertErr, "unable to convert ratelimit reset", "reset", reset)
+				l.Info("using default sleep duration", "duration", sleep)
 			} else {
 				sleep = time.Until(time.Unix(int64(resetTime), 0))
 			}
-			zap.L().
-				Info("rate limit reached, sleeping until reset", zap.Duration("duration", sleep))
+			l.Info("rate limit reached, sleeping until reset", "duration", sleep)
 			time.Sleep(sleep)
 		}
 
 		opt.Page = resp.NextPage
 	}
+	l.Info("crawling complete")
 	return nil
 }

@@ -15,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
 	"github.com/crashappsec/ocular-default-integrations/pkg/uploaders"
@@ -45,7 +46,7 @@ func main() {
 	}
 	resultsDir := os.Getenv(v1beta1.EnvVarResultsDir)
 
-	uploaderName := os.Getenv(v1beta1.EnvVarUploaderName)
+	uploaderName := strings.TrimPrefix(os.Getenv(v1beta1.EnvVarUploaderName), "ocular-defaults-")
 	if uploaderName == "" {
 		logger.Error(
 			fmt.Errorf("%s environment variable not set", v1beta1.EnvVarUploaderName),

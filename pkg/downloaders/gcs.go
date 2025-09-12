@@ -17,8 +17,10 @@ import (
 	"path/filepath"
 
 	"cloud.google.com/go/storage"
-	"go.uber.org/zap"
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"google.golang.org/api/iterator"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type gcs struct{}
@@ -29,14 +31,32 @@ func (gcs) GetName() string {
 	return "gcs"
 }
 
+func (g gcs) GetEnvSecrets() []definitions.EnvironmentSecret {
+	return []definitions.EnvironmentSecret{
+		{
+			SecretKey:  "downloader-gcs-credentials",
+			EnvVarName: "GOOGLE_APPLICATION_CREDENTIALS",
+		},
+	}
+}
+
+func (g gcs) GetFileSecrets() []definitions.FileSecret {
+	return nil
+}
+
+func (gcs) EnvironmentVariables() []corev1.EnvVar {
+	return nil
+}
+
 func (gcs) Download(ctx context.Context, bucketName, _, targetDir string) error {
+	l := log.FromContext(ctx)
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create GCS client: %w", err)
 	}
 	defer func() {
 		if err := client.Close(); err != nil {
-			zap.L().Error("unable to close client", zap.Error(err))
+			l.Error(err, "unable to close client")
 		}
 	}()
 
@@ -58,8 +78,7 @@ func (gcs) Download(ctx context.Context, bucketName, _, targetDir string) error 
 			return fmt.Errorf("failed to create local directory: %w", err)
 		}
 
-		zap.L().
-			Debug("downloading file to local", zap.String("file", objAttrs.Name), zap.String("localPath", localPath))
+		l.Info("downloading file to local", "file", objAttrs.Name, "localPath", localPath)
 		if err = downloadGCSObject(ctx, bucket, objAttrs.Name, localPath); err != nil {
 			return fmt.Errorf("failed to download object %s: %w", objAttrs.Name, err)
 		}
@@ -74,13 +93,14 @@ func downloadGCSObject(
 	bucket *storage.BucketHandle,
 	objectName, destPath string,
 ) error {
+	l := log.FromContext(ctx).WithValues("object", objectName, "destPath", destPath)
 	rc, err := bucket.Object(objectName).NewReader(ctx)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err := rc.Close(); err != nil {
-			zap.L().Error("failed to close response body", zap.Error(err))
+			l.Error(err, "failed to close response body")
 		}
 	}()
 
@@ -90,7 +110,7 @@ func downloadGCSObject(
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			zap.L().Error("failed to close response body", zap.Error(err))
+			l.Error(err, "failed to close response body")
 		}
 	}()
 

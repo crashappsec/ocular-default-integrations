@@ -16,15 +16,13 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	s3Service "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
-	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-/**************
- * Parameters *
- **************/
 
 const (
 	S3BucketParamName    = "BUCKET"
@@ -40,21 +38,44 @@ func (s s3) GetName() string {
 	return "s3"
 }
 
-func (s s3) GetParameters() map[string]v1beta1.ParameterDefinition {
-	return map[string]v1beta1.ParameterDefinition{
-		S3BucketParamName: {
+func (s s3) GetParameters() []v1beta1.ParameterDefinition {
+	return []v1beta1.ParameterDefinition{
+		{
+			Name:        S3BucketParamName,
 			Description: "Name of the S3 bucket to upload to.",
 			Required:    true,
 		},
-		S3RegionParamName: {
+		{
+			Name:        S3RegionParamName,
 			Description: "AWS region of the S3 bucket. Defaults to the region configured in the AWS SDK.",
 			Required:    false,
-			Default:     "",
 		},
-		S3SubFolderParamName: {
+		{
+			Name:        S3SubFolderParamName,
 			Description: "Subfolder in the S3 bucket to upload files to. Defaults to the root of the bucket.",
 			Required:    false,
-			Default:     "",
+		},
+	}
+}
+
+func (s s3) GetEnvSecrets() []definitions.EnvironmentSecret {
+	return nil
+}
+
+func (s s3) GetFileSecrets() []definitions.FileSecret {
+	return []definitions.FileSecret{
+		{
+			SecretKey: "aws-config",
+			MountPath: AWSConfigFileMountPath,
+		},
+	}
+}
+
+func (s s3) EnvironmentVariables() []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{
+			Name:  "AWS_CONFIG_FILE",
+			Value: AWSConfigFileMountPath,
 		},
 	}
 }
@@ -67,6 +88,7 @@ func (s s3) Upload(
 	params map[string]string,
 	files []string,
 ) error {
+	l := log.FromContext(ctx)
 	bucketName := params[S3BucketParamName]
 	regionOverride := params[S3RegionParamName]
 	subFolder := params[S3SubFolderParamName]
@@ -78,7 +100,7 @@ func (s s3) Upload(
 
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
-		zap.L().Error("Failed to load AWS configuration", zap.Error(err))
+		l.Error(err, "Failed to load AWS configuration")
 		return fmt.Errorf("failed to load AWS configuration: %w", err)
 	}
 
@@ -95,7 +117,7 @@ func (s s3) Upload(
 		}
 		defer func() {
 			if err := f.Close(); err != nil {
-				zap.L().Error("Failed to close file", zap.String("file", file), zap.Error(err))
+				l.Error(err, "Failed to close file", "file", file)
 			}
 		}()
 

@@ -16,11 +16,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
-	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type GitLab struct{}
@@ -31,9 +33,22 @@ func (g GitLab) GetName() string {
 
 var _ Crawler = GitLab{}
 
-/**************
- * Parameters *
- **************/
+func (GitLab) GetEnvSecrets() []definitions.EnvironmentSecret {
+	return []definitions.EnvironmentSecret{
+		{
+			SecretKey:  "gitlab-token",
+			EnvVarName: GitlabTokenSecretEnvVar,
+		},
+	}
+}
+
+func (GitLab) GetFileSecrets() []definitions.FileSecret {
+	return nil
+}
+
+func (GitLab) EnvironmentVariables() []corev1.EnvVar {
+	return nil
+}
 
 const (
 	GitLabGroupsParamName          = "GITLAB_GROUPS"
@@ -41,26 +56,25 @@ const (
 	GitlabIncludeSubgroupParamName = "INCLUDE_SUBGROUPS"
 )
 
-func (g GitLab) GetParameters() map[string]v1beta1.ParameterDefinition {
-	return map[string]v1beta1.ParameterDefinition{
-		GitLabGroupsParamName: {
+func (g GitLab) GetParameters() []v1beta1.ParameterDefinition {
+	return []v1beta1.ParameterDefinition{
+		{
+			Name:        GitLabGroupsParamName,
 			Description: "Comma-separated list of GitLab groups to crawl. If empty, the entire instance will be crawled.",
 			Required:    false,
 		},
-		GitlabInstanceURLParamName: {
+		{
+			Name:        GitlabInstanceURLParamName,
 			Description: "The base URL of the GitLab instance to crawl. For GitLab.com, use https://gitlab.com/api/v4",
 			Required:    true,
 		},
-		GitlabIncludeSubgroupParamName: {
+		{
+			Name:        GitlabIncludeSubgroupParamName,
 			Description: "If set, include projects from subgroups of the specified groups.",
 			Required:    false,
 		},
 	}
 }
-
-/************
- * Secrets  *
- ************/
 
 const (
 	GitlabTokenSecretEnvVar = "GITLAB_TOKEN"
@@ -75,6 +89,7 @@ func (g GitLab) Crawl(
 	params map[string]string,
 	queue chan CrawledTarget,
 ) error {
+	l := log.FromContext(ctx)
 	groups := strings.Split(params[GitLabGroupsParamName], ",")
 	token := os.Getenv(GitlabTokenSecretEnvVar)
 
@@ -87,8 +102,7 @@ func (g GitLab) Crawl(
 	// This will be overridden in the main function if 'DOWNLOADER_OVERRIDE' param is set
 	downloader := downloaders.Git{}.GetName()
 
-	l := zap.L().
-		With(zap.String("url", baseURL), zap.String("downloader", downloader), zap.Strings("groups", groups))
+	l = l.WithValues("url", baseURL, "downloader", downloader, "groups", groups)
 
 	client, err := gitlab.NewClient(token, gitlab.WithBaseURL(baseURL))
 	if err != nil {
@@ -100,26 +114,27 @@ func (g GitLab) Crawl(
 	}
 
 	var merr *multierror.Error
-	l.Info(fmt.Sprintf("crawling %d gitlab groups", len(groups)), zap.Int("groups", len(groups)))
+	l.Info(fmt.Sprintf("crawling %d gitlab groups", len(groups)), "groups", len(groups))
 	for _, group := range groups {
-		groupL := l.With(zap.String("group", group))
-		groupL.Debug(fmt.Sprintf("crawling gitlab group %s", group), zap.String("group", group))
+		groupL := l.WithValues("group", group)
+		groupL.Info(fmt.Sprintf("crawling gitlab group %s", group))
 		if err := crawlGitlabGroup(ctx, client, group, downloader, includeSubGroup, queue); err != nil {
-			groupL.Error("Error crawling gitlab group", zap.String("group", group), zap.Error(err))
+			groupL.Error(err, "Error crawling gitlab group")
 			merr = multierror.Append(merr, err)
 		}
 	}
-	l.Info("finished crawling gitlab groups", zap.Int("groups", len(groups)))
+	l.Info("finished crawling gitlab groups", "groups", len(groups))
 
 	return merr.ErrorOrNil()
 }
 
 func crawlGitlabGroup(
-	_ context.Context,
+	ctx context.Context,
 	c *gitlab.Client,
 	org, dl string, includeSubGroups bool,
 	queue chan CrawledTarget,
 ) error {
+	l := log.FromContext(ctx)
 	opt := gitlab.ListOptions{PerPage: 100}
 	for {
 		var (
@@ -140,6 +155,7 @@ func crawlGitlabGroup(
 		}
 
 		for _, repo := range projs {
+			l.Info("enqueuing gitlab repo", "repo", repo.HTTPURLToRepo)
 			queue <- CrawledTarget{
 				Target: v1beta1.Target{
 					Identifier: repo.HTTPURLToRepo,
@@ -157,14 +173,12 @@ func crawlGitlabGroup(
 			resetTime, convertErr := strconv.Atoi(reset)
 			sleep := time.Hour
 			if convertErr != nil {
-				zap.L().
-					Error("unable to convert ratelimit reset", zap.String("reset", reset), zap.Error(convertErr))
-				zap.L().Info("using default sleep duration", zap.Duration("duration", sleep))
+				l.Error(convertErr, "unable to convert ratelimit reset", "reset", reset)
+				l.Info("using default sleep duration", "duration", sleep)
 			} else {
 				sleep = time.Until(time.Unix(int64(resetTime), 0))
 			}
-			zap.L().
-				Info("rate limit reached, sleeping until reset", zap.Duration("duration", sleep))
+			l.Info("rate limit reached, sleeping until reset", "duration", sleep)
 			time.Sleep(sleep)
 		}
 
@@ -179,6 +193,7 @@ func crawlGitlabInstance(
 	dl string,
 	queue chan CrawledTarget,
 ) error {
+	l := log.FromContext(ctx)
 	opt := gitlab.ListOptions{PerPage: 100}
 	for {
 		var (
@@ -199,8 +214,7 @@ func crawlGitlabInstance(
 		for _, group := range groups {
 			err = crawlGitlabGroup(ctx, c, group.FullPath, dl, true, queue)
 			if err != nil {
-				zap.L().
-					Error("Error crawling gitlab group", zap.String("group", group.FullPath), zap.Error(err))
+				l.Error(err, "Error crawling gitlab group", "group", group.FullPath)
 				continue
 			}
 		}
@@ -214,14 +228,12 @@ func crawlGitlabInstance(
 			resetTime, convertErr := strconv.Atoi(reset)
 			sleep := time.Hour
 			if convertErr != nil {
-				zap.L().
-					Error("unable to convert ratelimit reset", zap.String("reset", reset), zap.Error(convertErr))
-				zap.L().Info("using default sleep duration", zap.Duration("duration", sleep))
+				l.Error(convertErr, "unable to convert ratelimit reset", "reset", reset)
+				l.Info("using default sleep duration", "duration", sleep)
 			} else {
 				sleep = time.Until(time.Unix(int64(resetTime), 0))
 			}
-			zap.L().
-				Info("rate limit reached, sleeping until reset", zap.Duration("duration", sleep))
+			l.Info("rate limit reached, sleeping until reset", "duration", sleep)
 			time.Sleep(sleep)
 		}
 

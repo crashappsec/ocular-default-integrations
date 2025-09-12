@@ -102,7 +102,7 @@ manifests: ## Generate manifests e.g. CRD, RBAC etc.
 generate:
 	@echo "Generating code ..."
 	@go generate ./...
-	@$(MAKE) license-fix
+	@$(MAKE) lint-fix
 
 
 .PHONY: fmt

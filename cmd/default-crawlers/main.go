@@ -16,6 +16,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/crashappsec/ocular-default-integrations/pkg/crawlers"
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
 	"github.com/crashappsec/ocular/api/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -51,7 +53,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	crawlerName := os.Getenv(v1beta1.EnvVarCrawlerName)
+	crawlerName := strings.TrimPrefix(os.Getenv(v1beta1.EnvVarCrawlerName), "ocular-defaults-")
 	if crawlerName == "" {
 		logger.Error(
 			fmt.Errorf("%s environment variable not set", v1beta1.EnvVarCrawlerName),
@@ -74,12 +76,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	paramDefinitions := crawler.GetParameters()
-	for name, def := range crawlers.DefaultParameters {
-		if _, exists := paramDefinitions[name]; !exists {
-			paramDefinitions[name] = def
-		}
-	}
+	paramDefinitions := input.CombineParameterDefinitions(crawler.GetParameters(), crawlers.DefaultParameters)
 
 	params, err := input.ParseParamsFromEnv(paramDefinitions)
 	if err != nil {
@@ -132,7 +129,7 @@ func main() {
 	lastRun := time.Now()
 	for crawledTarget := range queue {
 		target := crawledTarget.Target
-		downloader := crawledTarget.DefaultDownloader
+		downloader := "ocular-defaults-" + crawledTarget.DefaultDownloader
 		if downloaderOverride != "" {
 			downloader = downloaderOverride
 		}
@@ -155,15 +152,19 @@ func main() {
 
 		pipeline := &v1beta1.Pipeline{
 			ObjectMeta: v1.ObjectMeta{
-				GenerateName: fmt.Sprintf("search-%s-", searchName),
+				GenerateName: fmt.Sprintf("%s-", searchName),
 				Labels: map[string]string{
 					"ocular.crashoverride.run/search":  searchName,
 					"ocular.crashoverride.run/crawler": crawlerName,
 				},
 			},
 			Spec: v1beta1.PipelineSpec{
-				ProfileRef:              profile,
-				DownloaderRef:           downloader,
+				ProfileRef: corev1.ObjectReference{
+					Name: profile,
+				},
+				DownloaderRef: corev1.ObjectReference{
+					Name: downloader,
+				},
 				TTLSecondsAfterFinished: ptr.To[int32](int32(ttl.Seconds())),
 				Target:                  target,
 			},

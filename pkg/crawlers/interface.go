@@ -11,9 +11,11 @@ package crawlers
 import (
 	"context"
 
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // CrawledTarget represents a target that has been crawled that should have a pipeline run created for it.
@@ -39,45 +41,64 @@ const (
 	DownloaderOverrideParamName = "DOWNLOADER_OVERRIDE"
 )
 
-var DefaultParameters = map[string]v1beta1.ParameterDefinition{
-	ProfileParamName: {
+var DefaultParameters = []v1beta1.ParameterDefinition{
+	{
+		Name:        ProfileParamName,
 		Description: "Profile to use for the pipelines created from this crawler.",
 		Required:    true,
 	},
-	SleepDurationParamName: {
+	{
+		Name:        SleepDurationParamName,
 		Description: "Duration to sleep between requests. Will be parsed as a time.Duration.",
 		Required:    false,
-		Default:     SleepDurationDefaultValue,
+		Default:     ptr.To(SleepDurationDefaultValue),
 	},
-	PipelineTTLParamName: {
+	{
+		Name:        PipelineTTLParamName,
 		Description: "TTL for the pipelines created by this crawler. Will be parsed as a time.Duration.",
 		Required:    false,
-		Default:     PipelineTTLDefaultValue, // 7 days
+		Default:     ptr.To(PipelineTTLDefaultValue), // 7 days
 	},
-	DownloaderOverrideParamName: {
+	{
+		Name:        DownloaderOverrideParamName,
 		Description: "Override the downloader for the crawler. By default, it will be chosen based on the crawler type.",
 		Required:    false,
 	},
 }
 
 type Crawler interface {
-	GetParameters() map[string]v1beta1.ParameterDefinition
+	GetParameters() []v1beta1.ParameterDefinition
 	GetName() string
 	Crawl(ctx context.Context, params map[string]string, queue chan CrawledTarget) error
+	GetEnvSecrets() []definitions.EnvironmentSecret
+	GetFileSecrets() []definitions.FileSecret
+	EnvironmentVariables() []corev1.EnvVar
 }
 
 func GenerateObjects(image string) []*v1beta1.Crawler {
-	var crawlers []*v1beta1.Crawler
+	crawlerObjs := make([]*v1beta1.Crawler, 0, len(AllCrawlers))
 	for _, c := range AllCrawlers {
-		params := c.GetParameters()
+		crawlerParams := c.GetParameters()
+
+		params := make(map[string]v1beta1.ParameterDefinition, len(crawlerParams))
+		for _, p := range crawlerParams {
+			params[p.Name] = p
+		}
+
 		// add default parameters to the crawler parameters if they don't already exist
 		// this allows us to have common parameters across all crawlers, but crawlers can override them if needed
-		for k, v := range DefaultParameters {
-			if _, ok := params[k]; !ok {
-				params[k] = v
+		for _, v := range DefaultParameters {
+			if _, ok := params[v.Name]; !ok {
+				params[v.Name] = v
 			}
 		}
-		crawlers = append(crawlers, &v1beta1.Crawler{
+
+		var paramList []v1beta1.ParameterDefinition
+		for _, p := range params {
+			paramList = append(paramList, p)
+		}
+
+		crawlerObj := &v1beta1.Crawler{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: v1beta1.SchemeGroupVersion.String(),
 				Kind:       "Crawler",
@@ -90,9 +111,25 @@ func GenerateObjects(image string) []*v1beta1.Crawler {
 					Name:  c.GetName(),
 					Image: image,
 				},
-				Parameters: params,
+				Parameters: paramList,
 			},
-		})
+		}
+
+		if envVars := c.EnvironmentVariables(); envVars != nil {
+			crawlerObj.Spec.Container.Env = envVars
+		}
+
+		if envSecrets := c.GetEnvSecrets(); envSecrets != nil {
+			crawlerObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars("crawlers", envSecrets)
+		}
+
+		if fileSecrets := c.GetFileSecrets(); fileSecrets != nil {
+			volume, mounts := definitions.FileSecretsToVolumeMounts("crawlers", c.GetName(), fileSecrets)
+			crawlerObj.Spec.Volumes = append(crawlerObj.Spec.Volumes, volume)
+			crawlerObj.Spec.Container.VolumeMounts = append(crawlerObj.Spec.Container.VolumeMounts, mounts...)
+		}
+
+		crawlerObjs = append(crawlerObjs, crawlerObj)
 	}
-	return crawlers
+	return crawlerObjs
 }

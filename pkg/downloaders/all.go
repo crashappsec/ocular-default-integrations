@@ -50,9 +50,7 @@ package downloaders
 //		Definition: schemas.Downloader{
 //			Secrets: []schemas.SecretRef{
 //				{
-//					Name:        "downloader-gcs-credentials",
-//					MountType:   schemas.SecretMountTypeFile,
-//					MountTarget: "GOOGLE_APPLICATION_CREDENTIALS",
+//
 //				},
 //			},
 //		},

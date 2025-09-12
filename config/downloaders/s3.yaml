@@ -4,7 +4,20 @@ metadata:
   name: s3
 spec:
   container:
+    env:
+    - name: AWS_CONFIG_FILE
+      value: /ocular/aws/config
     image: default-downloaders:latest
     name: s3
     resources: {}
+    volumeMounts:
+    - mountPath: /ocular/aws/config
+      name: downloaders-s3-file-secrets
+      readOnly: true
+      subPath: aws-config
+  volumes:
+  - name: downloaders-s3-file-secrets
+    secret:
+      optional: true
+      secretName: downloaders-secrets
 status: {}

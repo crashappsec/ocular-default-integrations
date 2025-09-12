@@ -11,6 +11,7 @@ package downloaders
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"math"
@@ -18,17 +19,18 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.uber.org/zap"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func urlToReader(url string) (io.Reader, error) {
+func urlToReader(ctx context.Context, url string) (io.Reader, error) {
+	l := log.FromContext(ctx)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			zap.L().Error("failed to close response body", zap.Error(err))
+			l.Error(err, "failed to close response body")
 		}
 	}()
 	if resp.StatusCode != http.StatusOK {
@@ -41,8 +43,9 @@ func urlToReader(url string) (io.Reader, error) {
 	return readWriter, nil
 }
 
-func downloadFile(url, fpath string) error {
-	urlReader, err := urlToReader(url)
+func downloadFile(ctx context.Context, url, fpath string) error {
+	l := log.FromContext(ctx)
+	urlReader, err := urlToReader(ctx, url)
 	if err != nil {
 		return err
 	}
@@ -53,7 +56,7 @@ func downloadFile(url, fpath string) error {
 	}
 	defer func() {
 		if err := out.Close(); err != nil {
-			zap.L().Error("failed to close response body", zap.Error(err))
+			l.Error(err, "failed to close response body")
 		}
 	}()
 
@@ -61,7 +64,8 @@ func downloadFile(url, fpath string) error {
 	return err
 }
 
-func writeTar(tr *tar.Reader, parentDir string) error {
+func writeTar(ctx context.Context, tr *tar.Reader, parentDir string) error {
+	l := log.FromContext(ctx)
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -90,7 +94,7 @@ func writeTar(tr *tar.Reader, parentDir string) error {
 			_, err = io.Copy(outFile, tr)
 			defer func() {
 				if err := outFile.Close(); err != nil {
-					zap.L().Error("failed to close response body", zap.Error(err))
+					l.Error(err, "failed to close response body")
 				}
 			}()
 			if err != nil {
@@ -102,8 +106,7 @@ func writeTar(tr *tar.Reader, parentDir string) error {
 				return fmt.Errorf("setting permissions: %w", err)
 			}
 		default:
-			zap.L().
-				Info("skipping unsupported file type", zap.String("typeflag", string(header.Typeflag)))
+			l.Info("skipping unsupported file type", "typeflag", string(header.Typeflag))
 		}
 	}
 	return nil

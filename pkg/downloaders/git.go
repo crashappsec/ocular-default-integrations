@@ -14,11 +14,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
-	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Git struct{}
@@ -29,8 +31,25 @@ func (Git) GetName() string {
 	return "git"
 }
 
+func (Git) GetEnvSecrets() []definitions.EnvironmentSecret {
+	return nil
+}
+
+func (Git) GetFileSecrets() []definitions.FileSecret {
+	return []definitions.FileSecret{
+		{
+			SecretKey: "gitconfig",
+			MountPath: "/etc/gitconfig",
+		},
+	}
+}
+
+func (Git) EnvironmentVariables() []corev1.EnvVar {
+	return nil
+}
+
 func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) error {
-	l := zap.L().With(zap.String("cloneURL", cloneURL), zap.String("targetDir", targetDir))
+	l := log.FromContext(ctx).WithValues("cloneURL", cloneURL, "targetDir", targetDir)
 
 	// Initialize empty local repo
 	repo, err := gogit.PlainInit(targetDir, false)
@@ -46,7 +65,7 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 	// Parse /etc/gitconfig
 	cfg, err := config.LoadConfig(config.SystemScope)
 	if err != nil {
-		zap.L().Warn("failed to load config - ignore this if no config was set", zap.Error(err))
+		l.Info("failed to load config - ignore this if no config was set", "error", err)
 	} else {
 		cfg.Core = repoCfg.Core
 
@@ -74,7 +93,7 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 	})
 	switch {
 	case errors.Is(err, gogit.NoErrAlreadyUpToDate):
-		l.Debug("repository already up to date")
+		l.Info("repository already up to date")
 	case errors.Is(err, transport.ErrEmptyRemoteRepository):
 		l.Info("repository is empty, nothing to fetch")
 		return nil
@@ -82,35 +101,35 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 		return fmt.Errorf("failed to fetch repository: %w", err)
 	}
 
-	l.Debug("cloned Git repository")
+	l.Info("cloned Git repository")
 
 	var checkoutOptions *gogit.CheckoutOptions
 	switch {
 	case version == "":
 		ref, err := repo.Reference(plumbing.NewRemoteHEADReferenceName("origin"), true)
 		if err != nil {
-			l.Error("failed to resolve Git HEAD ref, defaulting to main", zap.Error(err))
+			l.Error(err, "failed to resolve Git HEAD ref, defaulting to main")
 			checkoutOptions = &gogit.CheckoutOptions{
 				Branch: plumbing.NewRemoteReferenceName("origin", "main"),
 			}
 		} else {
-			l.Debug("resolved Git HEAD ref", zap.String("ref", ref.Name().String()))
+			l.Info("resolved Git HEAD ref", "ref", ref.Name().String())
 			checkoutOptions = &gogit.CheckoutOptions{
 				Branch: ref.Name(),
 			}
 		}
 	case plumbing.IsHash(version):
-		l = l.With(zap.String("hash", version))
+		l = l.WithValues("hash", version)
 		checkoutOptions = &gogit.CheckoutOptions{
 			Hash: plumbing.NewHash(version),
 		}
 	default:
-		l = l.With(zap.String("branch", version))
+		l = l.WithValues("branch", version)
 		checkoutOptions = &gogit.CheckoutOptions{
 			Branch: plumbing.NewBranchReferenceName(version),
 		}
 	}
-	l.Debug("checking out revision")
+	l.Info("checking out revision")
 
 	worktree, err := repo.Worktree()
 	if err != nil {

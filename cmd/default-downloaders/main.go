@@ -15,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
 	"github.com/crashappsec/ocular/api/v1beta1"
@@ -37,7 +38,7 @@ func main() {
 	targetIdentifier := os.Getenv(v1beta1.EnvVarTargetIdentifier)
 	targetVersion := os.Getenv(v1beta1.EnvVarTargetVersion)
 
-	downloaderName := os.Getenv(v1beta1.EnvVarDownloaderName)
+	downloaderName := strings.TrimPrefix(os.Getenv(v1beta1.EnvVarDownloaderName), "ocular-defaults-")
 	if downloaderName == "" {
 		logger.Error(
 			fmt.Errorf("%s environment variable not set", v1beta1.EnvVarDownloaderName),

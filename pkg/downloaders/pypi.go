@@ -16,7 +16,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.uber.org/zap"
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type PyPIRelease struct {
@@ -34,6 +36,18 @@ type PyPIMetadata struct {
 
 type pypi struct{}
 
+func (p pypi) GetEnvSecrets() []definitions.EnvironmentSecret {
+	return nil
+}
+
+func (p pypi) GetFileSecrets() []definitions.FileSecret {
+	return nil
+}
+
+func (p pypi) EnvironmentVariables() []corev1.EnvVar {
+	return nil
+}
+
 var _ Downloader = pypi{}
 
 func (pypi) GetName() string {
@@ -41,6 +55,7 @@ func (pypi) GetName() string {
 }
 
 func (pypi) Download(ctx context.Context, packageName, version, targetDir string) error {
+	l := log.FromContext(ctx)
 	// Construct the URL for the PyPI JSON API
 	apiURL := fmt.Sprintf("https://pypi.org/pypi/%s/json", packageName)
 
@@ -51,7 +66,7 @@ func (pypi) Download(ctx context.Context, packageName, version, targetDir string
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			zap.L().Error("failed to close response body", zap.Error(err))
+			l.Error(err, "failed to close response body")
 		}
 	}()
 
@@ -79,9 +94,8 @@ func (pypi) Download(ctx context.Context, packageName, version, targetDir string
 
 	// download each file to the filename from the response, in the target directory
 	for _, fileInfo := range files {
-		zap.L().
-			Info("downloading file", zap.String("filename", fileInfo.Filename), zap.String("url", fileInfo.URL))
-		if err = downloadFile(fileInfo.URL, filepath.Join(targetDir, fileInfo.Filename)); err != nil {
+		l.Info("downloading file", "filename", fileInfo.Filename, "url", fileInfo.URL)
+		if err = downloadFile(ctx, fileInfo.URL, filepath.Join(targetDir, fileInfo.Filename)); err != nil {
 			return fmt.Errorf("failed to download file %s: %w", fileInfo.Filename, err)
 		}
 	}
@@ -91,18 +105,18 @@ func (pypi) Download(ctx context.Context, packageName, version, targetDir string
 	)
 	if err != nil {
 		// just log since this file is not critical
-		zap.L().Error("failed to create manifest file", zap.Error(err))
+		l.Error(err, "failed to create manifest file")
 	} else {
 		defer func() {
 			if err := manifest.Close(); err != nil {
-				zap.L().Error("failed to close response body", zap.Error(err))
+				l.Error(err, "failed to close response body")
 			}
 		}()
 		if err := json.NewEncoder(manifest).Encode(metadata); err != nil {
 			// just log since this file is not critical
-			zap.L().Error("failed to write manifest file", zap.Error(err))
+			l.Error(err, "failed to write manifest file")
 		} else {
-			zap.L().Info("wrote manifest file", zap.String("path", manifest.Name()))
+			l.Info("wrote manifest file", "path", manifest.Name())
 		}
 	}
 

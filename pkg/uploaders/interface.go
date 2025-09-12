@@ -11,6 +11,7 @@ package uploaders
 import (
 	"context"
 
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -23,7 +24,7 @@ var AllUploaders = []Uploader{
 }
 
 type Uploader interface {
-	GetParameters() map[string]v1beta1.ParameterDefinition
+	GetParameters() []v1beta1.ParameterDefinition
 	GetName() string
 	Upload(
 		ctx context.Context,
@@ -31,28 +32,46 @@ type Uploader interface {
 		params map[string]string,
 		files []string,
 	) error
+	GetEnvSecrets() []definitions.EnvironmentSecret
+	GetFileSecrets() []definitions.FileSecret
+	EnvironmentVariables() []corev1.EnvVar
 }
 
 func GenerateObjects(image string) []*v1beta1.Uploader {
-	var uploaders []*v1beta1.Uploader
-	for _, c := range AllUploaders {
-		params := c.GetParameters()
-		uploaders = append(uploaders, &v1beta1.Uploader{
+	uploaderObjs := make([]*v1beta1.Uploader, 0, len(AllUploaders))
+	for _, u := range AllUploaders {
+		params := u.GetParameters()
+		uploaderObj := &v1beta1.Uploader{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: v1beta1.SchemeGroupVersion.String(),
 				Kind:       "Uploader",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: c.GetName(),
+				Name: u.GetName(),
 			},
 			Spec: v1beta1.UploaderSpec{
 				Container: corev1.Container{
-					Name:  c.GetName(),
+					Name:  u.GetName(),
 					Image: image,
 				},
 				Parameters: params,
 			},
-		})
+		}
+
+		if envVars := u.EnvironmentVariables(); envVars != nil {
+			uploaderObj.Spec.Container.Env = envVars
+		}
+
+		if envSecrets := u.GetEnvSecrets(); envSecrets != nil {
+			uploaderObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars("uploaders", envSecrets)
+		}
+
+		if fileSecrets := u.GetFileSecrets(); fileSecrets != nil {
+			volume, mounts := definitions.FileSecretsToVolumeMounts("uploaders", u.GetName(), fileSecrets)
+			uploaderObj.Spec.Volumes = append(uploaderObj.Spec.Volumes, volume)
+			uploaderObj.Spec.Container.VolumeMounts = append(uploaderObj.Spec.Container.VolumeMounts, mounts...)
+		}
+		uploaderObjs = append(uploaderObjs, uploaderObj)
 	}
-	return uploaders
+	return uploaderObjs
 }
