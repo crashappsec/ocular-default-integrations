@@ -8,6 +8,14 @@ spec:
     name: static-list
     resources: {}
   parameters:
+  - default: 168h
+    description: TTL for the pipelines created by this crawler. Will be parsed as
+      a time.Duration.
+    name: PIPELINE_TTL
+    required: false
+  - description: New line separated list of target identifiers to crawl.
+    name: TARGET_IDENTIFIERS
+    required: true
   - description: Downloader to use for the crawled targets. (required for StaticList
       crawler)
     name: DOWNLOADER_OVERRIDE
@@ -19,11 +27,3 @@ spec:
     description: Duration to sleep between requests. Will be parsed as a time.Duration.
     name: SLEEP_DURATION
     required: false
-  - default: 168h
-    description: TTL for the pipelines created by this crawler. Will be parsed as
-      a time.Duration.
-    name: PIPELINE_TTL
-    required: false
-  - description: New line separated list of target identifiers to crawl.
-    name: TARGET_IDENTIFIERS
-    required: true

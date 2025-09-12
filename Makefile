@@ -151,7 +151,7 @@ lint: golangci-lint ## Run golangci-lint linter
 	$(LICENSE_EYE) header check
 
 .PHONY: lint-fix
-lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
+lint-fix: golangci-lint license-eye ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 	$(LICENSE_EYE) header fix
 

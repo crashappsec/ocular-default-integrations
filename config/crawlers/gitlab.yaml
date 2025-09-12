@@ -15,10 +15,6 @@ spec:
     name: gitlab
     resources: {}
   parameters:
-  - description: Override the downloader for the crawler. By default, it will be chosen
-      based on the crawler type.
-    name: DOWNLOADER_OVERRIDE
-    required: false
   - description: Comma-separated list of GitLab groups to crawl. If empty, the entire
       instance will be crawled.
     name: GITLAB_GROUPS
@@ -41,4 +37,8 @@ spec:
     description: TTL for the pipelines created by this crawler. Will be parsed as
       a time.Duration.
     name: PIPELINE_TTL
+    required: false
+  - description: Override the downloader for the crawler. By default, it will be chosen
+      based on the crawler type.
+    name: DOWNLOADER_OVERRIDE
     required: false
