@@ -80,22 +80,17 @@ func GenerateObjects(image string) []*v1beta1.Crawler {
 	for _, c := range AllCrawlers {
 		crawlerParams := c.GetParameters()
 
-		params := make(map[string]v1beta1.ParameterDefinition, len(crawlerParams))
+		seenParams := make(map[string]struct{}, len(crawlerParams))
 		for _, p := range crawlerParams {
-			params[p.Name] = p
+			seenParams[p.Name] = struct{}{}
 		}
 
 		// add default parameters to the crawler parameters if they don't already exist
 		// this allows us to have common parameters across all crawlers, but crawlers can override them if needed
 		for _, v := range DefaultParameters {
-			if _, ok := params[v.Name]; !ok {
-				params[v.Name] = v
+			if _, ok := seenParams[v.Name]; !ok {
+				crawlerParams = append(crawlerParams, v)
 			}
-		}
-
-		var paramList []v1beta1.ParameterDefinition
-		for _, p := range params {
-			paramList = append(paramList, p)
 		}
 
 		crawlerObj := &v1beta1.Crawler{
@@ -111,7 +106,7 @@ func GenerateObjects(image string) []*v1beta1.Crawler {
 					Name:  c.GetName(),
 					Image: image,
 				},
-				Parameters: paramList,
+				Parameters: crawlerParams,
 			},
 		}
 
