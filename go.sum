@@ -89,6 +89,14 @@ github.com/containerd/stargz-snapshotter/estargz v0.17.0 h1:+TyQIsR/zSFI1Rm31EQB
 github.com/containerd/stargz-snapshotter/estargz v0.17.0/go.mod h1:s06tWAiJcXQo9/8AReBCIo/QxcXFZ2n4qfsRnpl71SM=
 github.com/crashappsec/ocular v0.1.2-0.20250912164935-31e84ae2ba0b h1:9QjEjwsmvAjq3CEvMCdjrjDRoWg11GMeTdIgyy6IgTw=
 github.com/crashappsec/ocular v0.1.2-0.20250912164935-31e84ae2ba0b/go.mod h1:RXETwsNCyehe94hw5LyhPwMdRFCBoVH8D6k6gX99C64=
+github.com/crashappsec/ocular v0.1.2-0.20250924125504-1f3e5639f4b1 h1:N+zMYWiviyhipzqL3YUWIgndl5dBZh4oxfWB4sAbr6w=
+github.com/crashappsec/ocular v0.1.2-0.20250924125504-1f3e5639f4b1/go.mod h1:xUeVDbemzmnWropNOwBq8xJ2QC5X90EZioyN0FcR0oc=
+github.com/crashappsec/ocular v0.1.2-0.20250924161824-097f0af59144 h1:4QqpUt+JGpMylDVFEU0JYcU6wHACSWrMewy0HORZbGU=
+github.com/crashappsec/ocular v0.1.2-0.20250924161824-097f0af59144/go.mod h1:xUeVDbemzmnWropNOwBq8xJ2QC5X90EZioyN0FcR0oc=
+github.com/crashappsec/ocular v0.1.2-0.20250925184425-3cfb1441d2f0 h1:D29BiedZ1Nmd0i1ke4oKQv/O8+PYBV+PYuxMNhBkp0k=
+github.com/crashappsec/ocular v0.1.2-0.20250925184425-3cfb1441d2f0/go.mod h1:xUeVDbemzmnWropNOwBq8xJ2QC5X90EZioyN0FcR0oc=
+github.com/crashappsec/ocular v0.1.2-0.20250926132941-a497616b5b50 h1:lXNhxJLfpWg7nQ5nPJpAAoYAVLqxyYrm3oxLsqk9kf4=
+github.com/crashappsec/ocular v0.1.2-0.20250926132941-a497616b5b50/go.mod h1:xUeVDbemzmnWropNOwBq8xJ2QC5X90EZioyN0FcR0oc=
 github.com/cyphar/filepath-securejoin v0.4.1 h1:JyxxyPEaktOD+GAnqIqTf9A8tHyAG22rowi7HkoSU1s=
 github.com/cyphar/filepath-securejoin v0.4.1/go.mod h1:Sdj7gXlvMcPZsbhwhQ33GguGLDGQL7h7bg04C/+u9jI=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

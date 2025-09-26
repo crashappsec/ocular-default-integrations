@@ -1,4 +1,4 @@
-name: cd
+name: release
 on:
   release:
     types: [prereleased, released]
@@ -7,9 +7,9 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: 1.24
+  GO_VERSION: 1.25
   RELEASE_NAME: ${{ github.ref_name }}
-  RELEASE_FILE_NAME: 'ocular-default-integrations-definitions-${{ github.ref_name }}.zip'
+  RELEASE_FILE_NAME: 'ocular-default-integrations-manifest-${{ github.ref_name }}.yaml'
 
 jobs:
   publish-definitions:
@@ -19,7 +19,7 @@ jobs:
       contents: write
     steps:
       - name: checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
       - name: setup go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
@@ -27,12 +27,10 @@ jobs:
           cache-dependency-path: 'go.sum'
       - name: generate definitions
         run: |
-          go run ./hack/scripts/generate-definitions/main.go -output-folder ./out \
-            -image-tag "$RELEASE_NAME"
-          
-          cd out && zip -r ../$RELEASE_FILE_NAME .
+          make build-installer
+          mv dist/installer.yaml ${{ env.RELEASE_FILE_NAME }}
       - name: Upload Release Asset
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2
+        uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2
         with:
           files: ${{ env.RELEASE_FILE_NAME }}
   publish-docker:
@@ -47,12 +45,12 @@ jobs:
       contents: read
 #      id-token: write
     env:
-      IMAGE: "ghcr.io/${{ github.repository_owner }}/ocular-default-${{ matrix.integration }}"
       TAG: "ghcr.io/${{ github.repository_owner }}/ocular-default-${{ matrix.integration }}:${{ github.ref_name }}"
-      LATEST: "ghcr.io/${{ github.repository_owner }}/ocular-default-${{ matrix.integration }}:latest-prerelease"
+      LATEST: "ghcr.io/${{ github.repository_owner }}/ocular-default-${{ matrix.integration }}:latest"
+      LATEST_PRERELEASE: "ghcr.io/${{ github.repository_owner }}/ocular-default-${{ matrix.integration }}:latest-prerelease"
     steps:
       - name: checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           persist-credentials: false
       - name: Login to GitHub Container Registry
@@ -61,11 +59,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set latest tag
-        run: echo "LATEST=$IMAGE:latest" >> $GITHUB_ENV
-        if: ${{ ! github.event.release.prerelease }}
       - name: Set up Chalk
-        uses: crashappsec/setup-chalk-action@cf01792d450e4abb7716a5cd146e4f5e40243a97 # main
+        uses: crashappsec/setup-chalk-action@3456778b9c36430c155ede525be4b17c28a1ce2d # main
       - name: setup qemu
         uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
       - name: setup buildx
@@ -76,11 +71,11 @@ jobs:
         with:
           build-args: |
             INTEGRATION=${{ matrix.integration }}
-            LDFLAGS=-s -w -X github.com/crashappsec/ocular-default-integrations/internal/config.Version=${{ github.event.release.tag_name }} -X github.com/crashappsec/ocular-default-integrations/internal/config.BuildTime=${{steps.date.outputs.date}} -X github.com/crashappsec/ocular-default-integrations/internal/config.Commit=${{ github.sha }}
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+            LDFLAGS=-s -w -X main.version=${{ github.event.release.tag_name }} -X main.buildTime=${{steps.date.outputs.date}} -X main.gitCommit=${{ github.sha }}
+          platforms: linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
           push: true
           tags: |
             ${{ env.TAG }}
-            ${{ env.LATEST }}
+            ${{ !github.event.release.prerelease && env.LATEST || env.LATEST_PRERELEASE}}
           cache-from: type=gha
           cache-to: type=gha,mode=max

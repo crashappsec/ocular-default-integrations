@@ -1,9 +1,10 @@
 # Ocular Default Integrations Release Notes
 <!-- https://keepachangelog.com -->
 
-# [v0.2.0](https://github.com/crashappsec/ocular/releases/tag/v0.1.1) - **September 15, 2025**
+# [v0.1.2](https://github.com/crashappsec/ocular/releases/tag/v0.1.1) - **September 31, 2025**
 
 ### Added
+- Aligned with Ocular v0.2.0 release.
 - All resources now published as CustomResourceDefintions (CRDs) from Ocular in Kubernetes,
   allowing for easier management and integration with Kubernetes-native tools.
 - Publish as YAML manifests or Helm charts for easy deployment in Kubernetes environments.
@@ -11,7 +12,6 @@
 ### Removed
 
 - Removed support for Ocular API definitions in favor of Kubernetes-native management using CRDs.
-
 
 # [v0.1.1](https://github.com/crashappsec/ocular/releases/tag/v0.1.1) - **July 29, 2025**
 

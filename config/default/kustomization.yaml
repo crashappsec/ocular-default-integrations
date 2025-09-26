@@ -1,5 +1,3 @@
-namePrefix: ocular-defaults-
-
 # Labels to add to all resources and selectors.
 #labels:
 #- includeSelectors: true

@@ -8,4 +8,4 @@
 
 package ocular_default_integrations
 
-//go:generate go run ./hack/scripts/generate-definitions/main.go -output-folder ./config/
+//go:generate go run ./hack/scripts/generate-configs/main.go -output-folder ./config/

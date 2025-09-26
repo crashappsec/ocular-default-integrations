@@ -24,13 +24,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
+var (
+	version   = "unknown"
+	buildTime = "unknown"
+	gitCommit = "unknown"
+)
+
 func main() {
 	ctx := context.Background()
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	logger := zap.New(zap.UseFlagOptions(&zap.Options{}))
+	logger := zap.New(zap.UseFlagOptions(&zap.Options{})).
+		WithValues("version", version, "buildTime", buildTime, "gitCommit", gitCommit)
 	log.SetLogger(logger)
 	ctx = log.IntoContext(ctx, logger)
 

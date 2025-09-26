@@ -18,10 +18,21 @@ ifneq ($(DOCKER_DEFAULT_PLATFORM),)
 	export DOCKER_DEFAULT_PLATFORM
 endif
 
-OCULAR_UPLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-uploaders:latest
-OCULAR_DOWNLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-downloaders:latest
-OCULAR_CRAWLERS_IMG ?= ghcr.io/crashappsec/ocular-default-crawlers:latest
+OCULAR_DEFAULTS_VERSION ?= $(shell git describe --tags --dirty=-dev)
+export OCULAR_DEFAULTS_VERSION
+OCULAR_UPLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-uploaders:$(OCULAR_DEFAULTS_VERSION)
+OCULAR_DOWNLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-downloaders:$(OCULAR_DEFAULTS_VERSION)
+OCULAR_CRAWLERS_IMG ?= ghcr.io/crashappsec/ocular-default-crawlers:$(OCULAR_DEFAULTS_VERSION)
+export OCULAR_UPLOADERS_IMG
+export OCULAR_DOWNLOADERS_IMG
+export OCULAR_CRAWLERS_IMG
 
+# These are the default images used in the kustomization files. They are used to revert
+# the image back to the default one after building. (i.e. setting OCULAR_UPLOADERS_IMG to a local image
+# for testing, but the default image should be set back when building the installer)
+DEFAULT_OCULAR_UPLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-uploaders:latest
+DEFAULT_OCULAR_DOWNLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-downloaders:latest
+DEFAULT_OCULAR_CRAWLERS_IMG ?= ghcr.io/crashappsec/ocular-default-crawlers:latest
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -206,6 +217,11 @@ docker-push-uploaders: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${OCULAR_UPLOADERS_IMG}
 
 
+docker-buildx-all: ## Build and push docker image for the manager for cross-platform support
+	$(MAKE) docker-buildx-downloaders
+	$(MAKE) docker-buildx-crawlers
+	$(MAKE) docker-buildx-uploaders
+
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx OCULAR_CONTROLLER_IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
 # - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
@@ -245,11 +261,27 @@ docker-buildx-crawlers: ## Build and push docker image for the manager for cross
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
-	mkdir -p dist
-	cd config/crawlers && yq -ie '.[0].value = "${OCULAR_CRAWLERS_IMG}"' image-patch.yaml
-	cd config/uploaders && yq -ie '.[0].value = "${OCULAR_UPLOADERS_IMG}"' image-patch.yaml
-	cd config/downloaders && yq -ie '.[0].value = "${OCULAR_DOWNLOADERS_IMG}"' image-patch.yaml
-	$(KUSTOMIZE) build config/default > dist/install.yaml
+	@mkdir -p dist
+	@cd config/crawlers && yq -ie '.[0].value = "${OCULAR_CRAWLERS_IMG}"' image-patch.yaml
+	@cd config/uploaders && yq -ie '.[0].value = "${OCULAR_UPLOADERS_IMG}"' image-patch.yaml
+	@cd config/downloaders && yq -ie '.[0].value = "${OCULAR_DOWNLOADERS_IMG}"' image-patch.yaml
+	@$(KUSTOMIZE) build config/default > dist/install.yaml
+	@$(MAKE) revert-images
+
+.PHONY: build-helm
+build-helm: manifests generate kustomize ## Generate a helm chart at dist/chart
+	@./hack/scripts/generate-helm-chart.sh
+
+.PHONY: clean-helm
+clean-helm: ## Clean up the helm chart generated files
+	@rm -rf dist/chart
+
+.PHONY: revert-images
+revert-images: kustomize ## Revert the image in the kustomization to the default image.
+	@cd config/crawlers && yq -ie '.[0].value = "${DEFAULT_OCULAR_CRAWLERS_IMG}"' image-patch.yaml
+	@cd config/uploaders && yq -ie '.[0].value = "${DEFAULT_OCULAR_UPLOADERS_IMG}"' image-patch.yaml
+	@cd config/downloaders && yq -ie '.[0].value = "${DEFAULT_OCULAR_DOWNLOADERS_IMG}"' image-patch.yaml
+
 
 ##@ Dependencies
 
@@ -277,7 +309,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.18.0
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
-GOLANGCI_LINT_VERSION ?= v2.1.6
+GOLANGCI_LINT_VERSION ?= v2.5.0
 YQ_VERSION ?= v4.47.1
 CODE_GENERATOR_VERSION ?= v0.34.0
 LICENSE_EYE_VERSION ?= v0.7.0
