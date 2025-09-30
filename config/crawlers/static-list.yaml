@@ -1,0 +1,29 @@
+apiVersion: ocular.crashoverride.run/v1beta1
+kind: Crawler
+metadata:
+  name: static-list
+spec:
+  container:
+    image: default-crawlers:latest
+    name: static-list
+    resources: {}
+  parameters:
+  - description: New line separated list of target identifiers to crawl.
+    name: TARGET_IDENTIFIERS
+    required: true
+  - description: Downloader to use for the crawled targets. (required for StaticList
+      crawler)
+    name: DOWNLOADER_OVERRIDE
+    required: true
+  - description: Profile to use for the pipelines created from this crawler.
+    name: PROFILE
+    required: true
+  - default: 1m
+    description: Duration to sleep between requests. Will be parsed as a time.Duration.
+    name: SLEEP_DURATION
+    required: false
+  - default: 168h
+    description: TTL for the pipelines created by this crawler. Will be parsed as
+      a time.Duration.
+    name: PIPELINE_TTL
+    required: false

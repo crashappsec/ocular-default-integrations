@@ -15,20 +15,54 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
-	"go.uber.org/zap"
+	"github.com/crashappsec/ocular/api/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-/**************
- * Parameters *
- **************/
+type webhook struct{}
+
+var _ Uploader = webhook{}
+
+func (w webhook) GetName() string {
+	return "webhook"
+}
+
+func (w webhook) GetEnvSecrets() []definitions.EnvironmentSecret {
+	return nil
+}
+
+func (w webhook) GetFileSecrets() []definitions.FileSecret {
+	return nil
+}
+
+func (w webhook) EnvironmentVariables() []corev1.EnvVar {
+	return nil
+}
 
 const (
 	WebhookURLParamName    = "URL"
 	WebhookMethodParamName = "METHOD"
 )
 
-type webhook struct{}
+func (w webhook) GetParameters() []v1beta1.ParameterDefinition {
+	return []v1beta1.ParameterDefinition{
+		{
+			Name:        WebhookURLParamName,
+			Description: "URL of the webhook to send data to.",
+			Required:    true,
+		},
+		{
+			Name:        WebhookMethodParamName,
+			Description: "The HTTP method to use for the webhook request. Defaults to PUT.",
+			Required:    false,
+			Default:     ptr.To("PUT"),
+		},
+	}
+}
 
 func (w webhook) Upload(
 	ctx context.Context,
@@ -36,6 +70,7 @@ func (w webhook) Upload(
 	params map[string]string,
 	files []string,
 ) error {
+	l := log.FromContext(ctx)
 	u := params[WebhookURLParamName]
 	m := params[WebhookMethodParamName]
 	if m == "" {
@@ -45,6 +80,7 @@ func (w webhook) Upload(
 	client := &http.Client{}
 
 	for _, file := range files {
+		l.Info(fmt.Sprintf("uploading file %s", file), "method", m, "url", u, "file", file)
 		f, err := os.Open(filepath.Clean(file))
 		if err != nil {
 			return fmt.Errorf("failed to open file %s: %w", file, err)
@@ -59,7 +95,7 @@ func (w webhook) Upload(
 		}
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
-				zap.L().Error("failed to close response body", zap.Error(err))
+				l.Error(err, "failed to close response body")
 			}
 		}()
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {

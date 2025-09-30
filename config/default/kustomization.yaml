@@ -1,0 +1,10 @@
+# Labels to add to all resources and selectors.
+#labels:
+#- includeSelectors: true
+#  pairs:
+#    someName: someValue
+
+resources:
+- ../crawlers
+- ../downloaders
+- ../uploaders

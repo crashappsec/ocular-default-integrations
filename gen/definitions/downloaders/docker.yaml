@@ -1,8 +1,0 @@
-image: ghcr.io/crashappsec/ocular-default-downloaders:latest
-secrets:
-    - name: downloader-dockerconfig
-      mountType: file
-      mountTarget: /etc/docker/config.json
-env:
-    - name: DOCKER_CONFIG
-      value: /etc/docker

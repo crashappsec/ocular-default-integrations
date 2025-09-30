@@ -1,0 +1,44 @@
+apiVersion: ocular.crashoverride.run/v1beta1
+kind: Crawler
+metadata:
+  name: gitlab
+spec:
+  container:
+    env:
+    - name: GITLAB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          key: gitlab-token
+          name: crawlers-secrets
+          optional: true
+    image: default-crawlers:latest
+    name: gitlab
+    resources: {}
+  parameters:
+  - description: Comma-separated list of GitLab groups to crawl. If empty, the entire
+      instance will be crawled.
+    name: GITLAB_GROUPS
+    required: false
+  - description: The base URL of the GitLab instance to crawl. For GitLab.com, use
+      https://gitlab.com/api/v4
+    name: GITLAB_INSTANCE_URL
+    required: true
+  - description: If set, include projects from subgroups of the specified groups.
+    name: INCLUDE_SUBGROUPS
+    required: false
+  - description: Profile to use for the pipelines created from this crawler.
+    name: PROFILE
+    required: true
+  - default: 1m
+    description: Duration to sleep between requests. Will be parsed as a time.Duration.
+    name: SLEEP_DURATION
+    required: false
+  - default: 168h
+    description: TTL for the pipelines created by this crawler. Will be parsed as
+      a time.Duration.
+    name: PIPELINE_TTL
+    required: false
+  - description: Override the downloader for the crawler. By default, it will be chosen
+      based on the crawler type.
+    name: DOWNLOADER_OVERRIDE
+    required: false

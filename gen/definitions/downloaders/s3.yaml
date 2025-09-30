@@ -1,8 +1,0 @@
-image: ghcr.io/crashappsec/ocular-default-downloaders:latest
-secrets:
-    - name: downloader-aws-config
-      mountType: file
-      mountTarget: /etc/aws/config
-env:
-    - name: AWS_CONFIG_FILE
-      value: /etc/aws/config

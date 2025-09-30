@@ -18,7 +18,9 @@ import (
 	"net/http"
 	"strings"
 
-	"go.uber.org/zap"
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type NpmMetadata struct {
@@ -34,7 +36,25 @@ type NpmMetadata struct {
 
 type npm struct{}
 
+var _ Downloader = npm{}
+
+func (npm) GetName() string {
+	return "npm"
+}
+func (npm) GetEnvSecrets() []definitions.EnvironmentSecret {
+	return nil
+}
+
+func (npm) GetFileSecrets() []definitions.FileSecret {
+	return nil
+}
+
+func (npm) EnvironmentVariables() []corev1.EnvVar {
+	return nil
+}
+
 func (npm) Download(ctx context.Context, packageName, version, targetDir string) error {
+	l := log.FromContext(ctx)
 	registryURL := fmt.Sprintf("https://registry.npmjs.org/%s", packageName)
 
 	resp, err := http.Get(registryURL)
@@ -43,7 +63,7 @@ func (npm) Download(ctx context.Context, packageName, version, targetDir string)
 	}
 	func() {
 		if err := resp.Body.Close(); err != nil {
-			zap.L().Error("failed to close response body", zap.Error(err))
+			l.Error(err, "failed to close response body")
 		}
 	}()
 
@@ -66,7 +86,7 @@ func (npm) Download(ctx context.Context, packageName, version, targetDir string)
 	}
 
 	var tarballReader io.Reader
-	tarballReader, err = urlToReader(versionData.Dist.Tarball)
+	tarballReader, err = urlToReader(ctx, versionData.Dist.Tarball)
 	if err != nil {
 		return fmt.Errorf("failed to fetch tarball: %w", err)
 	}
@@ -80,7 +100,7 @@ func (npm) Download(ctx context.Context, packageName, version, targetDir string)
 	}
 
 	tr := tar.NewReader(tarballReader)
-	if err = writeTar(tr, targetDir); err != nil {
+	if err = writeTar(ctx, tr, targetDir); err != nil {
 		return fmt.Errorf("failed to write tarball as fs: %w", err)
 	}
 

@@ -17,6 +17,29 @@
 [![GitHub Release](https://img.shields.io/github/v/release/crashappsec/ocular-default-integrations)](https://github.com/crashappsec/ocular-default-integrations/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-
 A collection of default uploaders, downloaders, and crawlers that can be used to quickly get started with Ocular.
-These integrations are included in the [Ocular Helm chart](https://artifacthub.io/packages/helm/crashoverride-helm-charts/ocular) and can be used out of the box.
+
+These integrations are included in the helm
+chart "[Ocular default integrations](https://artifacthub.io/packages/helm/crashoverride-helm-charts/ocular-default-integrations)".
+
+## Installation
+
+Ensure that the [Ocular chart](https://artifacthub.io/packages/helm/crashoverride-helm-charts/ocular) is installed and
+configured.
+Then, install the default integrations chart:
+
+```bash
+helm repo add crashoverride-helm-charts https://crashoverride-helm-charts.storage
+helm repo update
+
+# Should be the namespace you want to run pipelines/searches in
+NAMESPACE="ocular"
+
+helm install ocular-default-integrations crashoverride-helm-charts/ocular-default-integrations \
+    --namespace $NAMESPACE \
+    --create-namespace
+# Resource will then be available as a CRD in the cluster
+# kubectl get crawlers -n $NAMESPACE
+# kubectl get downloaders -n $NAMESPACE
+# kubectl get uploaders -n $NAMESPACE
+```

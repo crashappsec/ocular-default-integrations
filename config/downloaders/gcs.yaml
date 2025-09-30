@@ -1,0 +1,17 @@
+apiVersion: ocular.crashoverride.run/v1beta1
+kind: Downloader
+metadata:
+  name: gcs
+spec:
+  container:
+    env:
+    - name: GOOGLE_APPLICATION_CREDENTIALS
+      valueFrom:
+        secretKeyRef:
+          key: downloader-gcs-credentials
+          name: downloaders-secrets
+          optional: true
+    image: default-downloaders:latest
+    name: gcs
+    resources: {}
+status: {}

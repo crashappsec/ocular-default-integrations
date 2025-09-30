@@ -18,13 +18,48 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	s3Service "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/hashicorp/go-multierror"
-	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+const (
+	AWSConfigFileMountPath = "/ocular/aws/config"
 )
 
 type s3 struct{}
 
+func (s s3) GetEnvSecrets() []definitions.EnvironmentSecret {
+	return nil
+}
+
+func (s s3) GetFileSecrets() []definitions.FileSecret {
+	return []definitions.FileSecret{
+		{
+			SecretKey: "aws-config",
+			MountPath: AWSConfigFileMountPath,
+		},
+	}
+}
+
+func (s s3) EnvironmentVariables() []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{
+			Name:  "AWS_CONFIG_FILE",
+			Value: AWSConfigFileMountPath,
+		},
+	}
+}
+
+var _ Downloader = s3{}
+
+func (s3) GetName() string {
+	return "s3"
+}
+
 func (s3) Download(ctx context.Context, bucketName, version, targetDir string) error {
+	l := log.FromContext(ctx)
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to load SDK config: %w", err)
@@ -46,10 +81,9 @@ func (s3) Download(ctx context.Context, bucketName, version, targetDir string) e
 		for _, obj := range page.Contents {
 			err := downloadS3Object(ctx, client, bucketName, *obj.Key, version, targetDir)
 			if err != nil {
-				zap.L().Error("failed to download object",
-					zap.String("bucket", bucketName),
-					zap.String("key", *obj.Key),
-					zap.Error(err))
+				l.Error(err, "failed to download object",
+					"bucket", bucketName,
+					"key", *obj.Key)
 				merr = multierror.Append(merr, err)
 			}
 		}
@@ -62,6 +96,7 @@ func downloadS3Object(
 	client *s3Service.Client,
 	bucketName, key, version, localDir string,
 ) error {
+	l := log.FromContext(ctx)
 	// Get the object from S3
 	input := &s3Service.GetObjectInput{
 		Bucket: aws.String(bucketName),
@@ -77,7 +112,7 @@ func downloadS3Object(
 	}
 	defer func() {
 		if err := output.Body.Close(); err != nil {
-			zap.L().Error("failed to close response body", zap.Error(err))
+			l.Error(err, "failed to close response body")
 		}
 	}()
 
@@ -92,7 +127,7 @@ func downloadS3Object(
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			zap.L().Error("failed to close response body", zap.Error(err))
+			l.Error(err, "failed to close response body")
 		}
 	}()
 

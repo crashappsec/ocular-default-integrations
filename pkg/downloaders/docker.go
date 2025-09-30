@@ -15,18 +15,53 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
-	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var shaRegex = regexp.MustCompile(`^[a-f0-9]{40}$`)
 
 type docker struct{}
 
+var _ Downloader = docker{}
+
+func (docker) GetName() string {
+	return "docker"
+}
+
+const (
+	DockerConfigFolder = "/ocular/docker"
+)
+
+func (docker) GetEnvSecrets() []definitions.EnvironmentSecret {
+	return nil
+}
+
+func (docker) GetFileSecrets() []definitions.FileSecret {
+	return []definitions.FileSecret{
+		{
+			SecretKey: "dockerconfig",
+			MountPath: DockerConfigFolder + "/config.json",
+		},
+	}
+}
+
+func (docker) EnvironmentVariables() []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{
+			Name:  "DOCKER_CONFIG",
+			Value: DockerConfigFolder,
+		},
+	}
+}
+
 func (docker) Download(ctx context.Context, dockerImage, tag, targetDir string) error {
+	l := log.FromContext(ctx)
 	var fullImage string
 	if shaRegex.MatchString(tag) {
 		fullImage = dockerImage + "@" + tag
@@ -36,19 +71,18 @@ func (docker) Download(ctx context.Context, dockerImage, tag, targetDir string) 
 
 	ref, err := name.ParseReference(fullImage, name.StrictValidation)
 	if err != nil {
-		zap.L().Error("Failed to parse reference", zap.String("image", fullImage), zap.Error(err))
+		l.Error(err, "Failed to parse reference", "image", fullImage)
 		return fmt.Errorf("parsing reference %q: %v", fullImage, err)
 	}
 
-	zap.L().Debug("fetching image from remote", zap.String("ref", ref.String()))
+	l.Info("fetching image from remote", "ref", ref.String())
 	img, err := remote.Image(
 		ref,
 		remote.WithContext(ctx),
 		remote.WithAuthFromKeychain(authn.DefaultKeychain),
 	)
 	if err != nil {
-		zap.L().
-			Error("Failed to get remote manifest", zap.String("image", fullImage), zap.Error(err))
+		l.Error(err, "Failed to get remote manifest", "image", fullImage)
 		return err
 	}
 
@@ -57,11 +91,11 @@ func (docker) Download(ctx context.Context, dockerImage, tag, targetDir string) 
 		return fmt.Errorf("unable to create tar file: %w", err)
 	}
 
-	zap.L().Info("Downloading image", zap.String("image", fullImage))
+	l.Info("Downloading image", "image", fullImage)
 	if err = tarball.Write(ref, img, tar); err != nil {
-		zap.L().Error("Failed to write tarball", zap.String("image", fullImage), zap.Error(err))
+		l.Error(err, "Failed to write tarball", "image", fullImage)
 		return err
 	}
-	zap.L().Info("Downloaded image successfully", zap.String("image", fullImage))
+	l.Info("Downloaded image successfully", "image", fullImage)
 	return nil
 }

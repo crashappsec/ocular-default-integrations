@@ -12,28 +12,49 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/crashappsec/ocular/pkg/schemas"
+	"github.com/crashappsec/ocular/api/v1beta1"
+	ocularRuntime "github.com/crashappsec/ocular/pkg/runtime"
 	"github.com/hashicorp/go-multierror"
 )
 
 func ParseParamsFromEnv(
-	definitions map[string]schemas.ParameterDefinition,
+	definitions []v1beta1.ParameterDefinition,
 ) (map[string]string, error) {
 	params := make(map[string]string)
 
 	var merr *multierror.Error
-	for name, def := range definitions {
-		envValue, exists := os.LookupEnv(schemas.ParameterNameToEnv(name))
+	for _, def := range definitions {
+		envValue, exists := os.LookupEnv(ocularRuntime.ParameterToEnvironmentVariable(def.Name))
 		if def.Required && !exists {
-			merr = multierror.Append(merr, fmt.Errorf("parameter %s is required", name))
+			merr = multierror.Append(merr, fmt.Errorf("parameter %s is required", def.Name))
 			continue
 		}
-		value := def.Default
+		var value string
+		if def.Default != nil {
+			value = *def.Default
+		}
 		if exists {
 			value = envValue
 		}
-		params[name] = value
+		params[def.Name] = value
 	}
 
 	return params, merr.ErrorOrNil()
+}
+
+func CombineParameterDefinitions(
+	lists ...[]v1beta1.ParameterDefinition,
+) []v1beta1.ParameterDefinition {
+	seen := make(map[string]struct{})
+	var combined []v1beta1.ParameterDefinition
+	for _, list := range lists {
+		for _, def := range list {
+			if _, exists := seen[def.Name]; exists {
+				continue
+			}
+			seen[def.Name] = struct{}{}
+			combined = append(combined, def)
+		}
+	}
+	return combined
 }

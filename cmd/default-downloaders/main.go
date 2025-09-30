@@ -12,51 +12,83 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
+	"strings"
 
-	"github.com/crashappsec/ocular-default-integrations/internal/config"
 	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
-	"github.com/crashappsec/ocular/pkg/schemas"
-	"go.uber.org/zap"
+	"github.com/crashappsec/ocular/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-func init() {
-	config.Init()
-}
+var (
+	version   = "unknown"
+	buildTime = "unknown"
+	gitCommit = "unknown"
+)
 
 func main() {
-	targetDir := os.Getenv(schemas.EnvVarTargetDir)
-	targetDownloader := os.Getenv(schemas.EnvVarTargetDownloader)
-	targetIdentifier := os.Getenv(schemas.EnvVarTargetIdentifier)
-	targetVersion := os.Getenv(schemas.EnvVarTargetVersion)
-
-	l := zap.L().With(
-		zap.String("target_dir", targetDir),
-		zap.String("target_downloader", targetDownloader),
-		zap.String("target_identifier", targetIdentifier),
-		zap.String("target_version", targetVersion),
-	)
-
-	l.Info(fmt.Sprintf("starting %s downloader", targetDownloader))
-
 	ctx := context.Background()
 
-	l.Debug("creating target directory")
+	opts := zap.Options{}
+	opts.BindFlags(flag.CommandLine)
+	flag.Parse()
+
+	logger := zap.New(zap.UseFlagOptions(&zap.Options{})).
+		WithValues("version", version, "buildTime", buildTime, "gitCommit", gitCommit)
+	log.SetLogger(logger)
+	ctx = log.IntoContext(ctx, logger)
+
+	targetDir := os.Getenv(v1beta1.EnvVarTargetDir)
+	targetIdentifier := os.Getenv(v1beta1.EnvVarTargetIdentifier)
+	targetVersion := os.Getenv(v1beta1.EnvVarTargetVersion)
+
+	downloaderName := strings.TrimPrefix(os.Getenv(v1beta1.EnvVarDownloaderName), "ocular-defaults-")
+	if downloaderName == "" {
+		logger.Error(
+			fmt.Errorf("%s environment variable not set", v1beta1.EnvVarDownloaderName),
+			"no downloader specified",
+		)
+		os.Exit(1)
+	}
+
+	l := logger.WithValues(
+		"target_dir", targetDir,
+		"downloader",
+		"target_identifier", targetIdentifier,
+		"target_version", targetVersion,
+	)
+
+	logger.Info("starting downloader")
+
+	logger.Info("creating target directory")
 	if err := os.MkdirAll(targetDir, 0o750); err != nil {
-		l.Fatal("error creating target directory", zap.Error(err))
+		logger.Error(err, "error creating target directory")
 	}
 
-	downloaderDef, exists := downloaders.GetAllDefaults()[targetDownloader]
-	if !exists {
-		l.Fatal(fmt.Sprintf("unable to find downloader with name %s", targetDownloader))
+	var downloader downloaders.Downloader
+	for _, d := range downloaders.AllDownloaders {
+		if d.GetName() == downloaderName {
+			downloader = d
+			break
+		}
+	}
+	if downloader == nil {
+		logger.Error(
+			fmt.Errorf("unknown downloader %s", downloaderName),
+			"no valid downloader specified",
+		)
+		os.Exit(1)
 	}
 
-	l.Info("downloading target", zap.Reflect("definition", downloaderDef))
+	l.Info("downloading target")
 
-	err := downloaderDef.Downloader.Download(ctx, targetIdentifier, targetVersion, targetDir)
+	err := downloader.Download(ctx, targetIdentifier, targetVersion, targetDir)
 	if err != nil {
-		l.Fatal("error downloading targets", zap.Error(err))
+		l.Error(err, "error downloading target")
+		os.Exit(1)
 	}
 
 	l.Info("downloaded target successfully")

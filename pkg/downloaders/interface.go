@@ -11,22 +11,63 @@ package downloaders
 import (
 	"context"
 
-	"github.com/crashappsec/ocular/pkg/schemas"
+	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
+	"github.com/crashappsec/ocular/api/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var AllDownloaders = []Downloader{
+	Git{},
+	docker{},
+	gcs{},
+	npm{},
+	pypi{},
+	s3{},
+}
+
 type Downloader interface {
+	GetName() string
 	Download(ctx context.Context, cloneURL, version, targetDir string) error
+	GetEnvSecrets() []definitions.EnvironmentSecret
+	GetFileSecrets() []definitions.FileSecret
+	EnvironmentVariables() []corev1.EnvVar
 }
 
-type DefaultDownloader struct {
-	Definition schemas.Downloader
-	Downloader Downloader
-}
+func GenerateObjects(image string) []*v1beta1.Downloader {
+	downloaderObjs := make([]*v1beta1.Downloader, 0, len(AllDownloaders))
+	for _, d := range AllDownloaders {
+		downlaoderObj := &v1beta1.Downloader{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: v1beta1.SchemeGroupVersion.String(),
+				Kind:       "Downloader",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: d.GetName(),
+			},
+			Spec: v1beta1.DownloaderSpec{
+				Container: corev1.Container{
+					Name:  d.GetName(),
+					Image: image,
+					Env:   d.EnvironmentVariables(),
+				},
+			},
+		}
 
-func GetAllDefaults() map[string]DefaultDownloader {
-	result := make(map[string]DefaultDownloader, len(allDownloaders))
-	for name, def := range allDownloaders {
-		result[name] = def
+		if envVars := d.EnvironmentVariables(); envVars != nil {
+			downlaoderObj.Spec.Container.Env = envVars
+		}
+
+		if envSecrets := d.GetEnvSecrets(); envSecrets != nil {
+			downlaoderObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars("downloaders", envSecrets)
+		}
+
+		if fileSecrets := d.GetFileSecrets(); fileSecrets != nil {
+			volume, mounts := definitions.FileSecretsToVolumeMounts("downloaders", d.GetName(), fileSecrets)
+			downlaoderObj.Spec.Volumes = append(downlaoderObj.Spec.Volumes, volume)
+			downlaoderObj.Spec.Container.VolumeMounts = append(downlaoderObj.Spec.Container.VolumeMounts, mounts...)
+		}
+		downloaderObjs = append(downloaderObjs, downlaoderObj)
 	}
-	return result
+	return downloaderObjs
 }
