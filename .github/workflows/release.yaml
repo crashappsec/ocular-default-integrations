@@ -26,7 +26,7 @@ jobs:
           cache-dependency-path: 'go.sum'
       - name: generate manifest
         run: |
-          make build-installer OCULAR_VERSION="$RELEASE_NAME$SUFFIX"
+          make build-installer OCULAR_DEFAULTS_VERSION="$RELEASE_NAME$SUFFIX"
           mv dist/install.yaml ocular-default-integrations${SUFFIX}.yaml
       - name: Upload Release Asset
         uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2

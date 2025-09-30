@@ -1,7 +1,7 @@
 # Ocular Default Integrations Release Notes
 <!-- https://keepachangelog.com -->
 
-# [v0.1.2](https://github.com/crashappsec/ocular/releases/tag/v0.1.1) - **September 31, 2025**
+# [v0.1.2](https://github.com/crashappsec/ocular/releases/tag/v0.1.2) - **September 30, 2025**
 
 ### Added
 - Aligned with Ocular v0.2.0 release.
