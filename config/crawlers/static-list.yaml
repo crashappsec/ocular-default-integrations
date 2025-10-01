@@ -27,3 +27,10 @@ spec:
       a time.Duration.
     name: PIPELINE_TTL
     required: false
+  - description: Service account to use for the pipelines created from this crawler.
+    name: SCAN_SERVICE_ACCOUNT
+    required: false
+  - description: Service account to use for the uploaders in the pipelines created
+      from this crawler.
+    name: UPLOAD_SERVICE_ACCOUNT
+    required: false

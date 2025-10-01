@@ -100,12 +100,14 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	cd config/uploaders && yq -ie '.[0].value = "${OCULAR_UPLOADERS_IMG}"' image-patch.yaml
 	cd config/downloaders &&  yq -ie '.[0].value = "${OCULAR_DOWNLOADERS_IMG}"' image-patch.yaml
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
+	@$(MAKE) revert-images
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
 manifests: ## Generate manifests e.g. CRD, RBAC etc.
+	$(MAKE) generate
 	@# empty command, since we are not using controller-gen to generate manifests
 	@# but in order to keep the Makefile structure we leave this target here
 

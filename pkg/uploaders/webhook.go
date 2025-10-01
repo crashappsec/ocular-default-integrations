@@ -9,8 +9,10 @@
 package uploaders
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -85,7 +87,11 @@ func (w webhook) Upload(
 		if err != nil {
 			return fmt.Errorf("failed to open file %s: %w", file, err)
 		}
-		req, err := http.NewRequestWithContext(ctx, m, u, f)
+		body, err := io.ReadAll(f)
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %w", file, err)
+		}
+		req, err := http.NewRequestWithContext(ctx, m, u, bytes.NewBuffer(body))
 		if err != nil {
 			return fmt.Errorf("failed to create request: %w", err)
 		}

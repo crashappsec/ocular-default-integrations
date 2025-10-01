@@ -33,12 +33,14 @@ var AllCrawlers = []Crawler{
 }
 
 const (
-	ProfileParamName            = "PROFILE"
-	SleepDurationParamName      = "SLEEP_DURATION"
-	SleepDurationDefaultValue   = "1m"
-	PipelineTTLParamName        = "PIPELINE_TTL"
-	PipelineTTLDefaultValue     = "168h" // 7 days
-	DownloaderOverrideParamName = "DOWNLOADER_OVERRIDE"
+	ProfileParamName              = "PROFILE"
+	SleepDurationParamName        = "SLEEP_DURATION"
+	SleepDurationDefaultValue     = "1m"
+	PipelineTTLParamName          = "PIPELINE_TTL"
+	PipelineTTLDefaultValue       = "168h" // 7 days
+	DownloaderOverrideParamName   = "DOWNLOADER_OVERRIDE"
+	ScanServiceAccountParamName   = "SCAN_SERVICE_ACCOUNT"
+	UploadServiceAccountParamName = "UPLOAD_SERVICE_ACCOUNT"
 )
 
 var DefaultParameters = []v1beta1.ParameterDefinition{
@@ -62,6 +64,16 @@ var DefaultParameters = []v1beta1.ParameterDefinition{
 	{
 		Name:        DownloaderOverrideParamName,
 		Description: "Override the downloader for the crawler. By default, it will be chosen based on the crawler type.",
+		Required:    false,
+	},
+	{
+		Name:        ScanServiceAccountParamName,
+		Description: "Service account to use for the pipelines created from this crawler.",
+		Required:    false,
+	},
+	{
+		Name:        UploadServiceAccountParamName,
+		Description: "Service account to use for the uploaders in the pipelines created from this crawler.",
 		Required:    false,
 	},
 }

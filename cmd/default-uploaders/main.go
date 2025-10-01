@@ -41,7 +41,7 @@ func main() {
 	log.SetLogger(logger)
 	ctx = log.IntoContext(ctx, logger)
 
-	logger.Info("starting crawler")
+	logger.Info("starting uploader")
 
 	var files []string
 	for i, arg := range os.Args {
@@ -74,8 +74,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	l.Info("starting uploader")
-
 	var uploader uploaders.Uploader
 	for _, u := range uploaders.AllUploaders {
 		if u.GetName() == uploaderName {
@@ -88,6 +86,8 @@ func main() {
 		logger.Error(fmt.Errorf("unknown uploader %s", uploaderName), "no valid uploader specified")
 		os.Exit(1)
 	}
+
+	logger.WithValues("uploader", uploaderName).Info("begin upload process")
 
 	params, err := input.ParseParamsFromEnv(uploader.GetParameters())
 	if err != nil {
