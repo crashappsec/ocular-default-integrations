@@ -42,3 +42,10 @@ spec:
       based on the crawler type.
     name: DOWNLOADER_OVERRIDE
     required: false
+  - description: Service account to use for the pipelines created from this crawler.
+    name: SCAN_SERVICE_ACCOUNT
+    required: false
+  - description: Service account to use for the uploaders in the pipelines created
+      from this crawler.
+    name: UPLOAD_SERVICE_ACCOUNT
+    required: false

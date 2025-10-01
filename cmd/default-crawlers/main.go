@@ -92,6 +92,8 @@ func main() {
 
 	profile := params[crawlers.ProfileParamName]
 	downloaderOverride := params[crawlers.DownloaderOverrideParamName]
+	scannerServiceAccount := params[crawlers.ScanServiceAccountParamName]
+	uploaderServiceAccount := params[crawlers.UploadServiceAccountParamName]
 
 	sleepDuration, err := time.ParseDuration(params[crawlers.SleepDurationParamName])
 	if err != nil {
@@ -176,6 +178,14 @@ func main() {
 				Target:                  target,
 			},
 		}
+
+		if scannerServiceAccount != "" {
+			pipeline.Spec.ScanServiceAccountName = scannerServiceAccount
+		}
+		if uploaderServiceAccount != "" {
+			pipeline.Spec.UploadServiceAccountName = uploaderServiceAccount
+		}
+
 		p, err := clientset.ApiV1beta1().
 			Pipelines(namespace).
 			Create(ctx, pipeline, v1.CreateOptions{})

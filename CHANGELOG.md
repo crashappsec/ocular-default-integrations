@@ -1,6 +1,11 @@
 # Ocular Default Integrations Release Notes
 <!-- https://keepachangelog.com -->
 
+# [v0.1.3](https://github.com/crashappsec/ocular/releases/tag/v0.1.2) - **October 1, 2025**
+
+### Added
+- Added ability to specify scan/upload service accounts for all default crawlers
+
 # [v0.1.2](https://github.com/crashappsec/ocular/releases/tag/v0.1.2) - **September 30, 2025**
 
 ### Added
