@@ -14,7 +14,7 @@ require (
 	github.com/google/go-github/v71 v71.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	gitlab.com/gitlab-org/api/client-go v0.148.1
-	google.golang.org/api v0.250.0
+	google.golang.org/api v0.251.0
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	k8s.io/client-go v0.34.1
