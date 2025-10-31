@@ -12,6 +12,8 @@ spec:
       name: downloaders-git-file-secrets
       readOnly: true
       subPath: gitconfig
+  metadataFiles:
+  - /mnt/metadata/git.json
   volumes:
   - name: downloaders-git-file-secrets
     secret:

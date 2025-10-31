@@ -106,3 +106,7 @@ func (npm) Download(ctx context.Context, packageName, version, targetDir string)
 
 	return nil
 }
+
+func (npm) GetMetadataFiles() []string {
+	return nil
+}

@@ -15,6 +15,10 @@ spec:
       name: downloaders-docker-file-secrets
       readOnly: true
       subPath: dockerconfig
+  metadataFiles:
+  - /mnt/metadata/docker.json
+  - /mnt/metadata/chalk.json
+  - /mnt/metadata/manifest.json
   volumes:
   - name: downloaders-docker-file-secrets
     secret:

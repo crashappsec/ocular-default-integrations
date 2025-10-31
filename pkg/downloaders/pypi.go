@@ -124,3 +124,6 @@ func (pypi) Download(ctx context.Context, packageName, version, targetDir string
 }
 
 // downloadFile downloads a file from a URL to a local path
+func (pypi) GetMetadataFiles() []string {
+	return nil
+}

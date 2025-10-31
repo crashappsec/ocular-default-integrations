@@ -19,7 +19,7 @@ import (
 
 var AllDownloaders = []Downloader{
 	Git{},
-	docker{},
+	Docker{},
 	gcs{},
 	npm{},
 	pypi{},
@@ -32,6 +32,7 @@ type Downloader interface {
 	GetEnvSecrets() []definitions.EnvironmentSecret
 	GetFileSecrets() []definitions.FileSecret
 	EnvironmentVariables() []corev1.EnvVar
+	GetMetadataFiles() []string
 }
 
 func GenerateObjects(image string) []*v1beta1.Downloader {
@@ -51,6 +52,7 @@ func GenerateObjects(image string) []*v1beta1.Downloader {
 					Image: image,
 					Env:   d.EnvironmentVariables(),
 				},
+				MetadataFiles: d.GetMetadataFiles(),
 			},
 		}
 

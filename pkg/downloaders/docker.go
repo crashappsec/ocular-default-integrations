@@ -9,13 +9,16 @@
 package downloaders
 
 import (
+	"archive/tar"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
+	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
@@ -26,11 +29,11 @@ import (
 
 var shaRegex = regexp.MustCompile(`^[a-f0-9]{40}$`)
 
-type docker struct{}
+type Docker struct{}
 
-var _ Downloader = docker{}
+var _ Downloader = Docker{}
 
-func (docker) GetName() string {
+func (Docker) GetName() string {
 	return "docker"
 }
 
@@ -38,11 +41,11 @@ const (
 	DockerConfigFolder = "/ocular/docker"
 )
 
-func (docker) GetEnvSecrets() []definitions.EnvironmentSecret {
+func (Docker) GetEnvSecrets() []definitions.EnvironmentSecret {
 	return nil
 }
 
-func (docker) GetFileSecrets() []definitions.FileSecret {
+func (Docker) GetFileSecrets() []definitions.FileSecret {
 	return []definitions.FileSecret{
 		{
 			SecretKey: "dockerconfig",
@@ -51,7 +54,7 @@ func (docker) GetFileSecrets() []definitions.FileSecret {
 	}
 }
 
-func (docker) EnvironmentVariables() []corev1.EnvVar {
+func (Docker) EnvironmentVariables() []corev1.EnvVar {
 	return []corev1.EnvVar{
 		{
 			Name:  "DOCKER_CONFIG",
@@ -60,7 +63,7 @@ func (docker) EnvironmentVariables() []corev1.EnvVar {
 	}
 }
 
-func (docker) Download(ctx context.Context, dockerImage, tag, targetDir string) error {
+func (Docker) Download(ctx context.Context, dockerImage, tag, targetDir string) error {
 	l := log.FromContext(ctx)
 	var fullImage string
 	if shaRegex.MatchString(tag) {
@@ -86,16 +89,127 @@ func (docker) Download(ctx context.Context, dockerImage, tag, targetDir string) 
 		return err
 	}
 
-	tar, err := os.Create(filepath.Clean(filepath.Join(targetDir, "target.tar")))
+	tarFile, err := os.Create(filepath.Clean(filepath.Join(targetDir, "target.tar")))
 	if err != nil {
 		return fmt.Errorf("unable to create tar file: %w", err)
 	}
+	defer func() {
+		if err := tarFile.Close(); err != nil {
+			l.Error(err, "failed to close tar reader")
+		}
+	}()
 
-	l.Info("Downloading image", "image", fullImage)
-	if err = tarball.Write(ref, img, tar); err != nil {
+	l.Info("downloading image", "image", fullImage)
+	if err = tarball.Write(ref, img, tarFile); err != nil {
 		l.Error(err, "Failed to write tarball", "image", fullImage)
 		return err
 	}
 	l.Info("Downloaded image successfully", "image", fullImage)
+
+	metadata := DockerMetadata{
+		Image: dockerImage,
+		Tag:   tag,
+	}
+
+	sha, err := img.Digest()
+	if err != nil {
+		l.Error(err, "Failed to get image digest", "image", fullImage)
+	} else {
+		metadata.SHA = sha.String()
+	}
+
+	if err = writeJSONStruct(DockerMetadataPath, metadata); err != nil {
+		l.Error(err, "Failed to write docker metadata", "path", DockerMetadataPath)
+	}
+
+	l.Info("beginning chalk extraction", "image", fullImage)
+
+	layers, err := img.Layers()
+	if err != nil {
+		l.Error(err, "failed to inspect image layers", "image", fullImage)
+		return nil
+	}
+
+	if len(layers) == 0 {
+		l.Info("image has no layers", "image", fullImage)
+		return nil
+	}
+
+	if lastLayer := layers[len(layers)-1]; lastLayer != nil {
+		l.Info("attempting to extract chalk metadata from last layer", "image", fullImage)
+		mediaType, err := lastLayer.MediaType()
+		if err != nil {
+			l.Error(err, "failed to get last layer media type", "image", fullImage)
+			return nil
+		}
+
+		if !mediaType.IsLayer() {
+			l.Info("last layer media type is not a layer, skipping chalk extraction", "mediaType", mediaType)
+			return nil
+		}
+
+		rc, err := lastLayer.Uncompressed()
+		if err != nil {
+			l.Error(err, "failed to get uncompressed last layer", "image", fullImage)
+			return nil
+		}
+
+		defer func() {
+			if err = rc.Close(); err != nil {
+				l.Error(err, "failed to close last layer reader")
+			}
+		}()
+
+		if err = extractChalk(ctx, rc, DockerChalkMetadataPath); err != nil {
+			l.Error(err, "failed to extract chalk metadata", "image", fullImage)
+		}
+	}
+
 	return nil
+}
+
+func extractChalk(ctx context.Context, tr io.Reader, chalkPath string) error {
+	l := log.FromContext(ctx)
+	tarReader := tar.NewReader(tr)
+	chalk, err := tarReader.Next()
+	if err != nil {
+		return fmt.Errorf("reading last layer tar: %w", err)
+	}
+
+	if chalk.Name != chalkFileName {
+		l.Info("chalk metadata file not found in last layer", "expected", chalkFileName, "found", chalk.Name)
+		return nil
+	}
+
+	chalkFile, err := os.Create(filepath.Clean(chalkPath))
+	if err != nil {
+		return fmt.Errorf("creating chalk metadata file: %w", err)
+	}
+	defer func() {
+		if err := chalkFile.Close(); err != nil {
+			l.Error(err, "failed to close chalk metadata file")
+		}
+	}()
+
+	_, err = io.Copy(chalkFile, tarReader)
+	if err != nil {
+		return fmt.Errorf("writing chalk metadata file: %w", err)
+	}
+	return nil
+}
+
+type DockerMetadata struct {
+	Image string `json:"image,omitempty"`
+	Tag   string `json:"tag,omitempty"`
+	SHA   string `json:"sha,omitempty"`
+}
+
+const (
+	chalkFileName           = "chalk.json"
+	DockerMetadataPath      = v1beta1.PipelineMetadataDirectory + "/docker.json"
+	DockerChalkMetadataPath = v1beta1.PipelineMetadataDirectory + "/" + chalkFileName
+)
+
+func (Docker) GetMetadataFiles() []string {
+	return []string{DockerMetadataPath, DockerChalkMetadataPath}
 }
