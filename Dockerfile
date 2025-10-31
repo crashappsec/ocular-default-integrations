@@ -6,7 +6,7 @@
 # See the LICENSE file in the root of this repository for full license text or
 # visit: <https://www.gnu.org/licenses/gpl-3.0.html>.
 
-FROM golang:1.25@sha256:8305f5fa8ea63c7b5bc85bd223ccc62941f852318ebfbd22f53bbd0b358c07e1 AS builder
+FROM golang:1.25@sha256:6bac879c5b77e0fc9c556a5ed8920e89dab1709bd510a854903509c828f67f96 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG LDFLAGS="-w -s"
@@ -37,9 +37,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM gcr.io/distroless/static:nonroot@sha256:e8a4044e0b4ae4257efa45fc026c0bc30ad320d43bd4c1a7d5271bd241e386d0
 
 WORKDIR /
-COPY --from=builder /workspace/entrypoint /bin/entrypoint
+COPY --from=builder /workspace/entrypoint /entrypoint
 USER 65538:65538
 
 LABEL org.opencontainers.image.source="https://github.com/crashappsec/ocular-default-integrations"
 
-ENTRYPOINT ["/bin/entrypoint"]
+ENTRYPOINT ["/entrypoint"]

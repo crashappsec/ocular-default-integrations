@@ -21,15 +21,17 @@ import (
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
-	S3BucketParamName    = "BUCKET"
-	S3RegionParamName    = "REGION"
-	S3SubFolderParamName = "SUBFOLDER"
+	S3BucketParamName         = "BUCKET"
+	S3RegionParamName         = "REGION"
+	S3ParentFolderParamName   = "PARENT_FOLDER"
+	S3FolderTemplateParamName = "FOLDER_TEMPLATE"
 
-	AWSConfigFileMountPath = "/aws/config"
+	AWSConfigFileMountPath = "/ocular/aws/config"
 )
 
 type s3 struct{}
@@ -42,7 +44,7 @@ func (s s3) GetParameters() []v1beta1.ParameterDefinition {
 	return []v1beta1.ParameterDefinition{
 		{
 			Name:        S3BucketParamName,
-			Description: "Name of the S3 bucket to upload to.",
+			Description: "PipelineName of the S3 bucket to upload to.",
 			Required:    true,
 		},
 		{
@@ -51,9 +53,13 @@ func (s s3) GetParameters() []v1beta1.ParameterDefinition {
 			Required:    false,
 		},
 		{
-			Name:        S3SubFolderParamName,
-			Description: "Subfolder in the S3 bucket to upload files to. Defaults to the root of the bucket.",
-			Required:    false,
+			Name: S3FolderTemplateParamName,
+			Description: "Template for the folder structure in the S3 bucket. " +
+				"Supports placeholders like {{ .PipelineName }}, {{ .TargetID }}, {{ .TargetVersion }}. " +
+				"Using '/' in the template will create nested folders. " +
+				"Defaults to '{{ .PipelineName }}'.",
+			Required: false,
+			Default:  ptr.To("{{ .PipelineName }}"),
 		},
 	}
 }
@@ -91,7 +97,17 @@ func (s s3) Upload(
 	l := log.FromContext(ctx)
 	bucketName := params[S3BucketParamName]
 	regionOverride := params[S3RegionParamName]
-	subFolder := params[S3SubFolderParamName]
+	folderTemplate, ok := params[S3FolderTemplateParamName]
+	if !ok {
+		folderTemplate = "{{ .PipelineName }}"
+	}
+
+	userTemplater := input.NewUserTemplater("s3 uploader")
+	artifactFolder, err := userTemplater.Execute(folderTemplate, metadata)
+	if err != nil {
+		l.Error(err, "Failed to parse folder template", "template", folderTemplate)
+		return fmt.Errorf("failed to parse folder template: %w", err)
+	}
 
 	var opts []func(*config.LoadOptions) error
 	if f, err := os.Stat(AWSConfigFileMountPath); err == nil && !f.IsDir() {
@@ -121,14 +137,15 @@ func (s s3) Upload(
 			}
 		}()
 
-		key := filepath.Join(subFolder, metadata.ID, filepath.Base(file))
-
+		key := filepath.Join(filepath.Clean(artifactFolder), filepath.Base(file))
+		l.Info("putting new object", "bucket", bucketName, "key", key)
 		_, err = s3Client.PutObject(ctx, &s3Service.PutObjectInput{
 			Bucket: &bucketName,
 			Key:    &key,
 			Body:   f,
 			Metadata: map[string]string{
-				"pipelineID":       metadata.ID,
+				"pipelineID":       metadata.PipelineName,
+				"downloader":       metadata.DownloaderName,
 				"targetIdentifier": metadata.TargetIdentifier,
 				"targetVersion":    metadata.TargetVersion,
 			},
