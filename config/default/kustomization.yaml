@@ -8,3 +8,6 @@ resources:
 - ../crawlers
 - ../downloaders
 - ../uploaders
+
+transformers:
+  - ./registry-transformer.yaml

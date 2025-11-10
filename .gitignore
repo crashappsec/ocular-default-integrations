@@ -286,3 +286,5 @@ hack/ignore
 
 # Commit go.work file to support Go modules
 !go.work
+
+config/dev/**/*
