@@ -36,7 +36,7 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	logger := zap.New(zap.UseFlagOptions(&zap.Options{})).
+	logger := zap.New(zap.UseFlagOptions(&opts)).
 		WithValues("version", version, "buildTime", buildTime, "gitCommit", gitCommit)
 	log.SetLogger(logger)
 	ctx = log.IntoContext(ctx, logger)
@@ -56,7 +56,7 @@ func main() {
 
 	l := logger.WithValues(
 		"target_dir", targetDir,
-		"downloader",
+		"downloader", downloaderName,
 		"target_identifier", targetIdentifier,
 		"target_version", targetVersion,
 	)

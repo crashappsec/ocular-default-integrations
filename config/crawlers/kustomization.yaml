@@ -5,11 +5,5 @@ resources:
 - github.yaml
 - gitlab.yaml
 - static-list.yaml
-patches:
-- path: image-patch.yaml
-  target:
-    kind: Crawler
-images:
-- name: default-crawlers
-  newName: ocular-default-crawlers
-  newTag: local
+- dockerhub.yaml
+- ghcr.yaml

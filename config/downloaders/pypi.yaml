@@ -4,7 +4,7 @@ metadata:
   name: pypi
 spec:
   container:
-    image: default-downloaders:latest
+    image: downloaders
     name: pypi
     resources: {}
 status: {}

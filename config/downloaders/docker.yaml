@@ -7,7 +7,7 @@ spec:
     env:
     - name: DOCKER_CONFIG
       value: /ocular/docker
-    image: default-downloaders:latest
+    image: downloaders
     name: docker
     resources: {}
     volumeMounts:

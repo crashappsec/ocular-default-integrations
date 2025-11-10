@@ -4,7 +4,7 @@ metadata:
   name: static-list
 spec:
   container:
-    image: default-crawlers:latest
+    image: crawlers
     name: static-list
     resources: {}
   parameters:

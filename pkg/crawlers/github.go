@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-github/v71/github"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -54,7 +55,8 @@ func (o GitHubOrg) EnvironmentVariables() []corev1.EnvVar {
 }
 
 const (
-	GitHubOrgsParamName = "GITHUB_ORGS"
+	GitHubOrgsParamName      = "GITHUB_ORGS"
+	GitHubSkipForksParamName = "SKIP_FORKS"
 )
 
 func (GitHubOrg) GetParameters() []v1beta1.ParameterDefinition {
@@ -63,6 +65,12 @@ func (GitHubOrg) GetParameters() []v1beta1.ParameterDefinition {
 			Name:        GitHubOrgsParamName,
 			Description: "Comma-separated list of GitLab groups to crawl.",
 			Required:    true,
+		},
+		{
+			Name:        GitHubSkipForksParamName,
+			Description: "If set to anything but '0' or 'false', forked repositories will be skipped.",
+			Required:    false,
+			Default:     ptr.To("false"),
 		},
 	}
 }
@@ -81,6 +89,8 @@ func (GitHubOrg) Crawl(
 	// retrieve params
 	orgs := strings.Split(params[GitHubOrgsParamName], ",")
 	token := os.Getenv(GitHubTokenSecretEnvVar)
+	skipForksParam := strings.ToLower(params[GitHubSkipForksParamName])
+	skipForks := skipForksParam != "0" && skipForksParam != "false" && skipForksParam != ""
 	downloader := downloaders.Git{}.GetName()
 
 	client := github.NewClient(nil)
@@ -93,7 +103,7 @@ func (GitHubOrg) Crawl(
 
 	var merr *multierror.Error
 	for _, org := range orgs {
-		if err := crawlOrg(ctx, client, org, downloader, queue); err != nil {
+		if err := crawlOrg(ctx, client, org, downloader, skipForks, queue); err != nil {
 			l.Error(err, "Error crawling org", "org", org)
 			merr = multierror.Append(merr, err)
 		}
@@ -106,6 +116,7 @@ func crawlOrg(
 	ctx context.Context,
 	c *github.Client,
 	org, dl string,
+	skipForks bool,
 	queue chan CrawledTarget,
 ) error {
 	l := log.FromContext(ctx)
@@ -147,6 +158,10 @@ func crawlOrg(
 		}
 
 		for _, repo := range repos {
+			if skipForks && repo.GetFork() {
+				l.Info("skipping forked repository", "repo", repo.GetFullName())
+				continue
+			}
 			l.Info("enqueuing repository", "repo", repo.GetFullName(), "url", repo.GetCloneURL())
 			queue <- CrawledTarget{
 				Target: v1beta1.Target{

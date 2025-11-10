@@ -11,7 +11,7 @@ spec:
           key: downloader-gcs-credentials
           name: downloaders-secrets
           optional: true
-    image: default-downloaders:latest
+    image: downloaders
     name: gcs
     resources: {}
 status: {}

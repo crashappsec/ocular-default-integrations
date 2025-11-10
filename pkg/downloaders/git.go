@@ -12,9 +12,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
+	"github.com/crashappsec/ocular-default-integrations/internal/utils"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -97,7 +97,7 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 			"+HEAD:refs/remotes/origin/HEAD",
 			"+refs/heads/*:refs/remotes/origin/*",
 		},
-		Progress: os.Stderr,
+		Progress: utils.NewLogWriter(l),
 	})
 	switch {
 	case errors.Is(err, gogit.NoErrAlreadyUpToDate):

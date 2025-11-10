@@ -44,7 +44,7 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	logger := zap.New(zap.UseFlagOptions(&zap.Options{})).
+	logger := zap.New(zap.UseFlagOptions(&opts)).
 		WithValues("version", version, "buildTime", buildTime, "gitCommit", gitCommit)
 	log.SetLogger(logger)
 	ctx = log.IntoContext(ctx, logger)
@@ -127,11 +127,11 @@ func main() {
 	wg.Add(1)
 
 	go func() {
-		logger.Info("starting crawler")
+		logger.Info("starting crawler", "crawler", crawlerName, "params", params)
 		defer wg.Done()
 		defer close(queue)
 		if err := crawler.Crawl(ctx, params, queue); err != nil {
-			logger.Error(err, "error running crawler")
+			logger.Error(err, "error running crawler", "crawler", crawlerName, "params", params)
 		}
 	}()
 

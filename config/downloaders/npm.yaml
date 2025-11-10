@@ -4,7 +4,7 @@ metadata:
   name: npm
 spec:
   container:
-    image: default-downloaders:latest
+    image: downloaders
     name: npm
     resources: {}
 status: {}

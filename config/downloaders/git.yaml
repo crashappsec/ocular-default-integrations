@@ -4,7 +4,7 @@ metadata:
   name: git
 spec:
   container:
-    image: default-downloaders:latest
+    image: downloaders
     name: git
     resources: {}
     volumeMounts:

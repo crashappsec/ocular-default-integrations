@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-var shaRegex = regexp.MustCompile(`^[a-f0-9]{40}$`)
+var shaRegex = regexp.MustCompile(`^sha256:[a-f0-9]{40}$`)
 
 type Docker struct{}
 
@@ -64,6 +64,9 @@ func (Docker) EnvironmentVariables() []corev1.EnvVar {
 }
 
 func (Docker) Download(ctx context.Context, dockerImage, tag, targetDir string) error {
+	if tag == "" {
+		tag = "latest"
+	}
 	l := log.FromContext(ctx)
 	var fullImage string
 	if shaRegex.MatchString(tag) {

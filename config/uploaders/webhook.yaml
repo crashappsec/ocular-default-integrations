@@ -4,7 +4,7 @@ metadata:
   name: webhook
 spec:
   container:
-    image: default-uploaders:latest
+    image: uploaders
     name: webhook
     resources: {}
   parameters:

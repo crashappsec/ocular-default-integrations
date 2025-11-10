@@ -14,9 +14,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/aws/aws-sdk-go-v2/config"
 	s3Service "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
+	"github.com/crashappsec/ocular-default-integrations/pkg/clients/aws"
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
@@ -27,11 +27,7 @@ import (
 
 const (
 	S3BucketParamName         = "BUCKET"
-	S3RegionParamName         = "REGION"
-	S3ParentFolderParamName   = "PARENT_FOLDER"
 	S3FolderTemplateParamName = "FOLDER_TEMPLATE"
-
-	AWSConfigFileMountPath = "/ocular/aws/config"
 )
 
 type s3 struct{}
@@ -41,27 +37,21 @@ func (s s3) GetName() string {
 }
 
 func (s s3) GetParameters() []v1beta1.ParameterDefinition {
-	return []v1beta1.ParameterDefinition{
-		{
+	return append(aws.GetParameters(),
+		v1beta1.ParameterDefinition{
 			Name:        S3BucketParamName,
 			Description: "PipelineName of the S3 bucket to upload to.",
 			Required:    true,
 		},
-		{
-			Name:        S3RegionParamName,
-			Description: "AWS region of the S3 bucket. Defaults to the region configured in the AWS SDK.",
-			Required:    false,
-		},
-		{
+		v1beta1.ParameterDefinition{
 			Name: S3FolderTemplateParamName,
 			Description: "Template for the folder structure in the S3 bucket. " +
-				"Supports placeholders like {{ .PipelineName }}, {{ .TargetID }}, {{ .TargetVersion }}. " +
+				"Supports placeholders like .PipelineName, .TargetID, .TargetVersion . " +
 				"Using '/' in the template will create nested folders. " +
-				"Defaults to '{{ .PipelineName }}'.",
+				"Defaults to '.PipelineName' .",
 			Required: false,
-			Default:  ptr.To("{{ .PipelineName }}"),
-		},
-	}
+			Default:  ptr.To(""), // default handled in code, templating gets messed up with helm rendering
+		})
 }
 
 func (s s3) GetEnvSecrets() []definitions.EnvironmentSecret {
@@ -69,21 +59,11 @@ func (s s3) GetEnvSecrets() []definitions.EnvironmentSecret {
 }
 
 func (s s3) GetFileSecrets() []definitions.FileSecret {
-	return []definitions.FileSecret{
-		{
-			SecretKey: "aws-config",
-			MountPath: AWSConfigFileMountPath,
-		},
-	}
+	return aws.GetAWSFileSecrets()
 }
 
 func (s s3) EnvironmentVariables() []corev1.EnvVar {
-	return []corev1.EnvVar{
-		{
-			Name:  "AWS_CONFIG_FILE",
-			Value: AWSConfigFileMountPath,
-		},
-	}
+	return nil
 }
 
 var _ Uploader = s3{}
@@ -96,9 +76,10 @@ func (s s3) Upload(
 ) error {
 	l := log.FromContext(ctx)
 	bucketName := params[S3BucketParamName]
-	regionOverride := params[S3RegionParamName]
+	regionOverride := params[aws.RegionParamName]
+	profileOverride := params[aws.ProfileParamName]
 	folderTemplate, ok := params[S3FolderTemplateParamName]
-	if !ok {
+	if !ok || folderTemplate == "" {
 		folderTemplate = "{{ .PipelineName }}"
 	}
 
@@ -109,19 +90,9 @@ func (s s3) Upload(
 		return fmt.Errorf("failed to parse folder template: %w", err)
 	}
 
-	var opts []func(*config.LoadOptions) error
-	if f, err := os.Stat(AWSConfigFileMountPath); err == nil && !f.IsDir() {
-		opts = append(opts, config.WithSharedConfigFiles([]string{AWSConfigFileMountPath}))
-	}
-
-	cfg, err := config.LoadDefaultConfig(ctx, opts...)
+	cfg, err := aws.BuildConfig(ctx, aws.WithProfile(profileOverride), aws.WithRegionOverride(regionOverride))
 	if err != nil {
-		l.Error(err, "Failed to load AWS configuration")
 		return fmt.Errorf("failed to load AWS configuration: %w", err)
-	}
-
-	if regionOverride != "" {
-		cfg.Region = regionOverride
 	}
 
 	s3Client := s3Service.NewFromConfig(cfg)
@@ -131,11 +102,6 @@ func (s s3) Upload(
 		if err != nil {
 			return fmt.Errorf("failed to open file %s: %w", file, err)
 		}
-		defer func() {
-			if err := f.Close(); err != nil {
-				l.Error(err, "Failed to close file", "file", file)
-			}
-		}()
 
 		key := filepath.Join(filepath.Clean(artifactFolder), filepath.Base(file))
 		l.Info("putting new object", "bucket", bucketName, "key", key)
@@ -152,6 +118,9 @@ func (s s3) Upload(
 		})
 		if err != nil {
 			merr = multierror.Append(merr, fmt.Errorf("failed to upload file %s: %w", file, err))
+		}
+		if err = f.Close(); err != nil {
+			l.Error(err, "Failed to close file", "file", file)
 		}
 	}
 

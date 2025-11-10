@@ -4,9 +4,3 @@ namePrefix: ocular-defaults-
 resources:
 - s3.yaml
 - webhook.yaml
-patches:
-- path: image-patch.yaml
-  target:
-    group: ocular.crashoverride.run
-    kind: Uploader
-    version: v1beta1
