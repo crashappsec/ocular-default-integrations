@@ -35,7 +35,7 @@ type Repository struct {
 }
 
 func (c *client) ListNamespaceRepositories(ctx context.Context, namespace string) ([]Repository, error) {
-	u, err := buildURL("/namespace/"+namespace+"/repositories/", map[string]string{
+	u, err := buildURL("/namespaces/"+namespace+"/repositories/", map[string]string{
 		"page_size": "100",
 	})
 	if err != nil {
@@ -46,7 +46,7 @@ func (c *client) ListNamespaceRepositories(ctx context.Context, namespace string
 
 type Tag struct {
 	Id     int `json:"id"`
-	Images struct {
+	Images []struct {
 		Architecture string `json:"architecture"`
 		Features     string `json:"features"`
 		Variant      string `json:"variant"`
@@ -71,14 +71,14 @@ type Tag struct {
 	Name                string    `json:"name"`
 	Repository          int       `json:"repository"`
 	FullSize            int       `json:"full_size"`
-	V2                  string    `json:"v2"`
+	V2                  bool      `json:"v2"`
 	Status              string    `json:"status"`
 	TagLastPulled       time.Time `json:"tag_last_pulled"`
 	TagLastPushed       time.Time `json:"tag_last_pushed"`
 }
 
 func (c *client) ListRepositoryTags(ctx context.Context, namespace, repository string) ([]Tag, error) {
-	u, err := buildURL("/namespace/"+namespace+"/repositories/"+repository, map[string]string{
+	u, err := buildURL("/namespaces/"+namespace+"/repositories/"+repository+"/tags", map[string]string{
 		"page_size": "100",
 	})
 	if err != nil {

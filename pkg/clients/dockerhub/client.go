@@ -107,7 +107,7 @@ func makePaginatedGetRequest[Result any](ctx context.Context, c *client, u strin
 	for {
 		result, err := makeRequest[PaginatedResponse[Result]](ctx, c, http.MethodGet, u, nil)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error making request to endpoint '%s': %w", u, err)
 		}
 		results = append(results, result.Results...)
 		if result.Next == "" {

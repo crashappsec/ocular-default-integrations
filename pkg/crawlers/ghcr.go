@@ -115,34 +115,33 @@ func crawlGHCRContainers(
 	l := log.FromContext(ctx)
 
 	opt := &github.ListOptions{PerPage: 100}
+	containers, _, err := indexer.ListPackages(ctx, org, &github.PackageListOptions{
+		PackageType: github.Ptr("container"),
+		ListOptions: *opt,
+	})
+	if err != nil {
+		return fmt.Errorf("listing GHCR packages for org %q: %v", org, err)
+	}
+
 	var merr *multierror.Error
-	for {
-		containers, _, err := indexer.ListPackages(ctx, org, &github.PackageListOptions{
-			PackageType: github.Ptr("container"),
-			ListOptions: *opt,
-		})
+	for _, container := range containers {
+		versions, err := getRecentGHCRTags(ctx, org, container.GetName(), indexer, tagLimit)
 		if err != nil {
 			merr = multierror.Append(merr, err)
-			break
+			l.Error(err, "Error getting recent tags for container", "container", container.GetName())
+			continue
 		}
-		for _, container := range containers {
-			versions, err := getRecentGHCRTags(ctx, org, container.GetName(), indexer, tagLimit)
-			if err != nil {
-				merr = multierror.Append(merr, err)
-				break
+		targetID := fmt.Sprintf("ghcr.io/%s/%s", org, container.GetName())
+		for _, version := range versions {
+			target := CrawledTarget{
+				Target: v1beta1.Target{
+					Identifier: targetID,
+					Version:    version,
+				},
+				DefaultDownloader: dl,
 			}
-			targetID := fmt.Sprintf("ghcr.io/%s/%s", org, container.GetName())
-			for _, version := range versions {
-				target := CrawledTarget{
-					Target: v1beta1.Target{
-						Identifier: targetID,
-						Version:    version,
-					},
-					DefaultDownloader: dl,
-				}
-				l.Info("Discovered GHCR container", "identifier", targetID, "version", version)
-				queue <- target
-			}
+			l.Info("Discovered GHCR container", "identifier", targetID, "version", version)
+			queue <- target
 		}
 	}
 	return merr.ErrorOrNil()
