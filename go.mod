@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.31.17
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.90.0
 	github.com/aws/smithy-go v1.23.2
-	github.com/crashappsec/ocular v0.2.2-beta.6
+	github.com/crashappsec/ocular v0.2.2-beta.6.0.20251112185303-9070503e0c95
 	github.com/go-git/go-git/v5 v5.16.3
 	github.com/google/go-containerregistry v0.20.6
 	github.com/google/go-github/v71 v71.0.0

@@ -15,4 +15,3 @@ spec:
     description: The HTTP method to use for the webhook request. Defaults to PUT.
     name: METHOD
     required: false
-status: {}

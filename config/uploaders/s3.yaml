@@ -34,4 +34,3 @@ spec:
     secret:
       optional: true
       secretName: uploaders-secrets
-status: {}

@@ -7,4 +7,3 @@ spec:
     image: downloaders
     name: pypi
     resources: {}
-status: {}

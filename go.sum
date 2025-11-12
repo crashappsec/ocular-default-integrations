@@ -133,6 +133,8 @@ github.com/crashappsec/ocular v0.2.2-beta.1 h1:wyoy2deiguffYHeghWK+GGM7+BsE6nS4P
 github.com/crashappsec/ocular v0.2.2-beta.1/go.mod h1:xUeVDbemzmnWropNOwBq8xJ2QC5X90EZioyN0FcR0oc=
 github.com/crashappsec/ocular v0.2.2-beta.6 h1:QF6snxPJkJVBy3483CFU1N+H5Wgt3SBrgd7pZ+2iHrw=
 github.com/crashappsec/ocular v0.2.2-beta.6/go.mod h1:EimB0dcMZ05F6fqYjHtJfy86qQT3yWN/tqnAi+0n49k=
+github.com/crashappsec/ocular v0.2.2-beta.6.0.20251112185303-9070503e0c95 h1:Rgjs3+L8nvZXEHKwLfb5HT/DWDTBPLnNLUeBTsf3dSg=
+github.com/crashappsec/ocular v0.2.2-beta.6.0.20251112185303-9070503e0c95/go.mod h1:EimB0dcMZ05F6fqYjHtJfy86qQT3yWN/tqnAi+0n49k=
 github.com/cyphar/filepath-securejoin v0.5.0 h1:hIAhkRBMQ8nIeuVwcAoymp7MY4oherZdAxD+m0u9zaw=
 github.com/cyphar/filepath-securejoin v0.5.0/go.mod h1:Sdj7gXlvMcPZsbhwhQ33GguGLDGQL7h7bg04C/+u9jI=
 github.com/cyphar/filepath-securejoin v0.6.0 h1:BtGB77njd6SVO6VztOHfPxKitJvd/VPT+OFBFMOi1Is=

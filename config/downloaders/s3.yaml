@@ -20,4 +20,3 @@ spec:
     secret:
       optional: true
       secretName: downloaders-secrets
-status: {}
