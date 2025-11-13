@@ -27,13 +27,6 @@ export OCULAR_UPLOADERS_IMG
 export OCULAR_DOWNLOADERS_IMG
 export OCULAR_CRAWLERS_IMG
 
-# These are the default images used in the kustomization files. They are used to revert
-# the image back to the default one after building. (i.e. setting OCULAR_UPLOADERS_IMG to a local image
-# for testing, but the default image should be set back when building the installer)
-DEFAULT_OCULAR_UPLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-uploaders:latest
-DEFAULT_OCULAR_DOWNLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-downloaders:latest
-DEFAULT_OCULAR_CRAWLERS_IMG ?= ghcr.io/crashappsec/ocular-default-crawlers:latest
-
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
