@@ -11,11 +11,8 @@ SCRIPT_DIRECTORY=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 ROOT_DIRECTORY=$(readlink -f "$SCRIPT_DIRECTORY/../../")
 
 set -e
-# shellcheck disable=SC2064
-# This will set the images back to their original values on exit
-trap "make -C \"${ROOT_DIRECTORY}\" revert-images" EXIT
 
-CHART_DIRECTORY="${ROOT_DIRECTORY}/dist/chart/"
+CHART_DIRECTORY="${ROOT_DIRECTORY}/dist/chart"
 
 mkdir -p "$CHART_DIRECTORY"
 
@@ -56,9 +53,8 @@ resource_kinds=("crawlers" "downloaders" "uploaders")
 
 for kind in "${resource_kinds[@]}"; do
   kind_templates_dir="$CHART_DIRECTORY/templates/$kind"
-  yq -ie ".[0].value = \"{{ .Values.$kind.image.repository }}:{{ .Values.$kind.image.tag }}\"" "config/$kind/image-patch.yaml"
   mkdir -p "$kind_templates_dir"
-  (cd "$kind_templates_dir" && "${ROOT_DIRECTORY}/bin/kustomize" build "$ROOT_DIRECTORY/config/$kind" | yq -s '.metadata.name')
+  (cd "$kind_templates_dir" && "${ROOT_DIRECTORY}/bin/kustomize" build "$ROOT_DIRECTORY/config/$kind" | yq ".spec.container.image = \"{{ .Values.$kind.image.repository }}:{{ .Values.$kind.image.tag }}\"" -s '.metadata.name + ".yaml"')
 done
 
 

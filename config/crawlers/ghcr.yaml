@@ -1,30 +1,28 @@
 apiVersion: ocular.crashoverride.run/v1beta1
 kind: Crawler
 metadata:
-  name: gitlab
+  name: ghcr
 spec:
   container:
     env:
-    - name: GITLAB_TOKEN
+    - name: GITHUB_TOKEN
       valueFrom:
         secretKeyRef:
-          key: gitlab-token
+          key: github-token
           name: crawlers-secrets
           optional: true
     image: crawlers
-    name: gitlab
+    name: ghcr
     resources: {}
   parameters:
-  - description: Comma-separated list of GitLab groups to crawl. If empty, the entire
-      instance will be crawled.
-    name: GITLAB_GROUPS
-    required: false
-  - description: The base URL of the GitLab instance to crawl. For GitLab.com, use
-      https://gitlab.com/api/v4
-    name: GITLAB_INSTANCE_URL
+  - description: Comma-separated list of Docker Hub organizations to crawl.
+    name: GITHUB_ORGS
     required: true
-  - description: If set, include projects from subgroups of the specified groups.
-    name: INCLUDE_SUBGROUPS
+  - default: "1"
+    description: Maximum number of tags (versions) to retrieve per image. Will retrieve
+      the latest N tags for each GHCR image and start a new pipeline for each. Set
+      to 0 to retrieve all versions. Defaults to 1.
+    name: RECENT_TAG_LIMIT
     required: false
   - description: Profile to use for the pipelines created from this crawler.
     name: PROFILE

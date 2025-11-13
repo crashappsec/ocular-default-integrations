@@ -50,19 +50,19 @@ func init() {
 	flag.StringVar(
 		&crawlersImage,
 		"crawlers-image",
-		"ghcr.io/crashappsec/ocular-default-crawlers",
+		"crawlers",
 		"the image to use for the default crawlers",
 	)
 	flag.StringVar(
 		&downloadersImage,
 		"downloaders-image",
-		"ghcr.io/crashappsec/ocular-default-downloaders",
+		"downloaders",
 		"the image to use for the default downloaders",
 	)
 	flag.StringVar(
 		&uploadersImage,
 		"uploaders-image",
-		"ghcr.io/crashappsec/ocular-default-uploaders",
+		"uploaders",
 		"the image to use for the default uploaders",
 	)
 	flag.StringVar(&imagesTag, "images-tag", "latest", "the tag to use for all images")
@@ -104,22 +104,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	downloaderImageStub := "default-downloaders:latest"
-	downloaderObjs := downloaders.GenerateObjects(downloaderImageStub)
+	downloaderObjs := downloaders.GenerateObjects(downloadersImage)
 	if err = createResourceKustomizeFolder[*v1beta1.Downloader](ctx, "Downloaders", downloaderObjs); err != nil {
 		logger.Error(err, "error creating downloader kustomize folder")
 		os.Exit(1)
 	}
 
-	crawlerImageStub := "default-crawlers:latest"
-	crawlerObjs := crawlers.GenerateObjects(crawlerImageStub)
+	crawlerObjs := crawlers.GenerateObjects(crawlersImage)
 	if err = createResourceKustomizeFolder[*v1beta1.Crawler](ctx, "Crawlers", crawlerObjs); err != nil {
 		logger.Error(err, "error creating crawler kustomize folder")
 		os.Exit(1)
 	}
 
-	uploaderImageStub := "default-uploaders:latest"
-	uploaderObjs := uploaders.GenerateObjects(uploaderImageStub)
+	uploaderObjs := uploaders.GenerateObjects(uploadersImage)
 	if err = createResourceKustomizeFolder[*v1beta1.Uploader](ctx, "Uploaders", uploaderObjs); err != nil {
 		logger.Error(err, "error creating uploader kustomize folder")
 		os.Exit(1)

@@ -1,3 +1,0 @@
-- op: replace
-  path: /spec/container/image
-  value: 'ghcr.io/crashappsec/ocular-default-crawlers:latest'

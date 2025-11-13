@@ -4,7 +4,7 @@ metadata:
   name: git
 spec:
   container:
-    image: default-downloaders:latest
+    image: downloaders
     name: git
     resources: {}
     volumeMounts:
@@ -12,9 +12,10 @@ spec:
       name: downloaders-git-file-secrets
       readOnly: true
       subPath: gitconfig
+  metadataFiles:
+  - /mnt/metadata/git.json
   volumes:
   - name: downloaders-git-file-secrets
     secret:
       optional: true
       secretName: downloaders-secrets
-status: {}

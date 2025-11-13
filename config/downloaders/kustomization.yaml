@@ -8,9 +8,3 @@ resources:
 - npm.yaml
 - pypi.yaml
 - s3.yaml
-patches:
-- path: image-patch.yaml
-  target:
-    group: ocular.crashoverride.run
-    kind: Downloader
-    version: v1beta1

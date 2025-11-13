@@ -12,6 +12,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -108,6 +109,23 @@ func writeTar(ctx context.Context, tr *tar.Reader, parentDir string) error {
 		default:
 			l.Info("skipping unsupported file type", "typeflag", string(header.Typeflag))
 		}
+	}
+	return nil
+}
+
+func writeJSONStruct[T any](path string, jsonStruct T) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("could not create docker metadata file: %w", err)
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
+	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "  ")
+	if err = encoder.Encode(jsonStruct); err != nil {
+		return fmt.Errorf("could not write docker metadata: %w", err)
 	}
 	return nil
 }

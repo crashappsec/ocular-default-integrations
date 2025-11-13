@@ -7,7 +7,7 @@ spec:
     env:
     - name: DOCKER_CONFIG
       value: /ocular/docker
-    image: default-downloaders:latest
+    image: downloaders
     name: docker
     resources: {}
     volumeMounts:
@@ -15,9 +15,11 @@ spec:
       name: downloaders-docker-file-secrets
       readOnly: true
       subPath: dockerconfig
+  metadataFiles:
+  - /mnt/metadata/docker.json
+  - /mnt/metadata/chalk.json
   volumes:
   - name: downloaders-docker-file-secrets
     secret:
       optional: true
       secretName: downloaders-secrets
-status: {}

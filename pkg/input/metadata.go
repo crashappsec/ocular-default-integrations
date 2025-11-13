@@ -16,19 +16,21 @@ import (
 )
 
 type PipelineMetadata struct {
-	ID               string
-	TargetIdentifier string
-	TargetVersion    string
+	PipelineName     string `json:"pipelineName"`
+	TargetIdentifier string `json:"targetIdentifier"`
+	TargetVersion    string `json:"targetVersion,omitempty"`
+	DownloaderName   string `json:"downloaderName"`
 }
 
 func ParseMetadataFromEnv() (PipelineMetadata, error) {
 	metadata := PipelineMetadata{
-		ID:               os.Getenv(v1beta1.EnvVarPipelineName),
+		PipelineName:     os.Getenv(v1beta1.EnvVarPipelineName),
 		TargetIdentifier: os.Getenv(v1beta1.EnvVarTargetIdentifier),
 		TargetVersion:    os.Getenv(v1beta1.EnvVarTargetVersion),
+		DownloaderName:   os.Getenv(v1beta1.EnvVarDownloaderName),
 	}
 
-	if metadata.ID == "" {
+	if metadata.PipelineName == "" {
 		return metadata, fmt.Errorf(
 			"missing required environment variable %s",
 			v1beta1.EnvVarPipelineName,
@@ -38,6 +40,13 @@ func ParseMetadataFromEnv() (PipelineMetadata, error) {
 		return metadata, fmt.Errorf(
 			"missing required environment variable %s",
 			v1beta1.EnvVarTargetIdentifier,
+		)
+	}
+
+	if metadata.DownloaderName == "" {
+		return metadata, fmt.Errorf(
+			"missing required environment variable %s",
+			v1beta1.EnvVarDownloaderName,
 		)
 	}
 

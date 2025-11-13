@@ -18,7 +18,7 @@ ifneq ($(DOCKER_DEFAULT_PLATFORM),)
 	export DOCKER_DEFAULT_PLATFORM
 endif
 
-OCULAR_DEFAULTS_VERSION ?= $(shell git describe --tags --dirty=-dev)
+OCULAR_DEFAULTS_VERSION ?= latest
 export OCULAR_DEFAULTS_VERSION
 OCULAR_UPLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-uploaders:$(OCULAR_DEFAULTS_VERSION)
 OCULAR_DOWNLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-downloaders:$(OCULAR_DEFAULTS_VERSION)
@@ -26,13 +26,6 @@ OCULAR_CRAWLERS_IMG ?= ghcr.io/crashappsec/ocular-default-crawlers:$(OCULAR_DEFA
 export OCULAR_UPLOADERS_IMG
 export OCULAR_DOWNLOADERS_IMG
 export OCULAR_CRAWLERS_IMG
-
-# These are the default images used in the kustomization files. They are used to revert
-# the image back to the default one after building. (i.e. setting OCULAR_UPLOADERS_IMG to a local image
-# for testing, but the default image should be set back when building the installer)
-DEFAULT_OCULAR_UPLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-uploaders:latest
-DEFAULT_OCULAR_DOWNLOADERS_IMG ?= ghcr.io/crashappsec/ocular-default-downloaders:latest
-DEFAULT_OCULAR_CRAWLERS_IMG ?= ghcr.io/crashappsec/ocular-default-crawlers:latest
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -96,20 +89,21 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/crawlers && yq -ie '.[0].value = "${OCULAR_CRAWLERS_IMG}"' image-patch.yaml
-	cd config/uploaders && yq -ie '.[0].value = "${OCULAR_UPLOADERS_IMG}"' image-patch.yaml
-	cd config/downloaders &&  yq -ie '.[0].value = "${OCULAR_DOWNLOADERS_IMG}"' image-patch.yaml
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
-	@$(MAKE) revert-images
+
+deploy-%: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config
+	$(KUSTOMIZE) build config/$(@:deploy-%=%) | $(KUBECTL) apply -f -
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
 manifests: ## Generate manifests e.g. CRD, RBAC etc.
-	$(MAKE) generate
+	@$(MAKE) generate
 	@# empty command, since we are not using controller-gen to generate manifests
 	@# but in order to keep the Makefile structure we leave this target here
+
+##@ Development
 
 .PHONY: generate lint fmt test view-test-coverage fmt-code fmt-license
 generate:
@@ -219,10 +213,7 @@ docker-push-uploaders: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${OCULAR_UPLOADERS_IMG}
 
 
-docker-buildx-all: ## Build and push docker image for the manager for cross-platform support
-	$(MAKE) docker-buildx-downloaders
-	$(MAKE) docker-buildx-crawlers
-	$(MAKE) docker-buildx-uploaders
+docker-buildx-all: docker-buildx-crawlers docker-buildx-downloaders docker-buildx-uploaders ## Build and push docker image for the manager for cross-platform support
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx OCULAR_CONTROLLER_IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
@@ -232,43 +223,34 @@ docker-buildx-all: ## Build and push docker image for the manager for cross-plat
 # To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
 PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 .PHONY: docker-buildx-uploaders
-docker-buildx-uploaders: ## Build and push docker image for the manager for cross-platform support
+docker-buildx-img-%: ## Build and push docker image for the manager for cross-platform support
+	@echo -e "This will build and \e[31m$$(tput bold)push$$(tput sgr0)\e[0m the image $(OCULAR_$(shell echo '$(@:docker-buildx-img-%=%)' | tr '[:lower:]' '[:upper:]')_IMG) for platforms: ${PLATFORMS}."
+	@read -p "press enter to continue, or ctrl-c to abort: "
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name ocular-builder
 	$(CONTAINER_TOOL) buildx use ocular-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${OCULAR_UPLOADERS_IMG} --build-arg INTEGRATION=uploaders -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag $(OCULAR_$(shell echo '$(@:docker-buildx-img-%=%)' | tr '[:lower:]' '[:upper:]')_IMG) --build-arg INTEGRATION=$(@:docker-buildx-img-%=%) -f Dockerfile.cross .
 	- $(CONTAINER_TOOL) buildx rm ocular-builder
 	rm Dockerfile.cross
 
 .PHONY: docker-buildx-downloaders
-docker-buildx-downloaders: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name ocular-builder
-	$(CONTAINER_TOOL) buildx use ocular-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${OCULAR_DOWNLOADERS_IMG} --build-arg INTEGRATION=downloaders -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm ocular-builder
-	rm Dockerfile.cross
+docker-buildx-downloaders: docker-buildx-img-downloaders ## Build and push docker image for the manager for cross-platform support
 
 .PHONY: docker-buildx-crawlers
-docker-buildx-crawlers: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name ocular-builder
-	$(CONTAINER_TOOL) buildx use ocular-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${OCULAR_CRAWLERS_IMG} --build-arg INTEGRATION=crawlers  -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm ocular-builder
-	rm Dockerfile.cross
+docker-buildx-crawlers: docker-buildx-img-crawlers ## Build and push docker image for the manager for cross-platform support
+
+.PHONY: docker-buildx-uploaders
+docker-buildx-uploaders: docker-buildx-img-uploaders ## Build and push docker image for the manager for cross-platform support
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
 	@mkdir -p dist
-	@cd config/crawlers && yq -ie '.[0].value = "${OCULAR_CRAWLERS_IMG}"' image-patch.yaml
-	@cd config/uploaders && yq -ie '.[0].value = "${OCULAR_UPLOADERS_IMG}"' image-patch.yaml
-	@cd config/downloaders && yq -ie '.[0].value = "${OCULAR_DOWNLOADERS_IMG}"' image-patch.yaml
 	@$(KUSTOMIZE) build config/default > dist/install.yaml
-	@$(MAKE) revert-images
+
+build-installer-%: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
+	@mkdir -p dist
+	@$(KUSTOMIZE) build config/$(@:build-installer-%=%) > dist/install-$(@:build-installer-%=%).yaml
 
 .PHONY: build-helm
 build-helm: manifests generate kustomize ## Generate a helm chart at dist/chart
@@ -277,13 +259,6 @@ build-helm: manifests generate kustomize ## Generate a helm chart at dist/chart
 .PHONY: clean-helm
 clean-helm: ## Clean up the helm chart generated files
 	@rm -rf dist/chart
-
-.PHONY: revert-images
-revert-images: kustomize ## Revert the image in the kustomization to the default image.
-	@cd config/crawlers && yq -ie '.[0].value = "${DEFAULT_OCULAR_CRAWLERS_IMG}"' image-patch.yaml
-	@cd config/uploaders && yq -ie '.[0].value = "${DEFAULT_OCULAR_UPLOADERS_IMG}"' image-patch.yaml
-	@cd config/downloaders && yq -ie '.[0].value = "${DEFAULT_OCULAR_DOWNLOADERS_IMG}"' image-patch.yaml
-
 
 ##@ Dependencies
 

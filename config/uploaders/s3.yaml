@@ -4,32 +4,33 @@ metadata:
   name: s3
 spec:
   container:
-    env:
-    - name: AWS_CONFIG_FILE
-      value: /aws/config
-    image: default-uploaders:latest
+    image: uploaders
     name: s3
     resources: {}
     volumeMounts:
-    - mountPath: /aws/config
+    - mountPath: /ocular/aws/config
       name: uploaders-s3-file-secrets
       readOnly: true
       subPath: aws-config
   parameters:
-  - description: Name of the S3 bucket to upload to.
+  - description: AWS region of the ECR repository. Defaults to the region configured
+      in the AWS SDK.
+    name: AWS_REGION
+    required: false
+  - description: ARN of the role to assume for accessing the ECR repository. Optional.
+    name: AWS_PROFILE
+    required: false
+  - description: PipelineName of the S3 bucket to upload to.
     name: BUCKET
     required: true
-  - description: AWS region of the S3 bucket. Defaults to the region configured in
-      the AWS SDK.
-    name: REGION
-    required: false
-  - description: Subfolder in the S3 bucket to upload files to. Defaults to the root
-      of the bucket.
-    name: SUBFOLDER
+  - default: ""
+    description: Template for the folder structure in the S3 bucket. Supports placeholders
+      like .PipelineName, .TargetID, .TargetVersion . Using '/' in the template will
+      create nested folders. Defaults to '.PipelineName' .
+    name: FOLDER_TEMPLATE
     required: false
   volumes:
   - name: uploaders-s3-file-secrets
     secret:
       optional: true
       secretName: uploaders-secrets
-status: {}

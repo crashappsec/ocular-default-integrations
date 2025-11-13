@@ -135,3 +135,7 @@ func downloadS3Object(
 	_, err = io.Copy(file, output.Body)
 	return err
 }
+
+func (s3) GetMetadataFiles() []string {
+	return nil
+}

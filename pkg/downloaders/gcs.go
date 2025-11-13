@@ -117,3 +117,7 @@ func downloadGCSObject(
 	_, err = io.Copy(f, rc)
 	return err
 }
+
+func (g gcs) GetMetadataFiles() []string {
+	return nil
+}

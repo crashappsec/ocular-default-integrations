@@ -90,7 +90,16 @@ func (g GitLab) Crawl(
 	queue chan CrawledTarget,
 ) error {
 	l := log.FromContext(ctx)
-	groups := strings.Split(params[GitLabGroupsParamName], ",")
+	splitGroups := strings.Split(params[GitLabGroupsParamName], ",")
+	var groups []string
+	for _, group := range splitGroups {
+		trimmed := strings.TrimSpace(group)
+		if trimmed != "" {
+			groups = append(groups, trimmed)
+		}
+	}
+	l.Info("crawling groups", "groups", groups)
+
 	token := os.Getenv(GitlabTokenSecretEnvVar)
 
 	baseURL := params[GitlabInstanceURLParamName]

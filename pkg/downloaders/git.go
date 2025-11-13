@@ -12,9 +12,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
+	"github.com/crashappsec/ocular-default-integrations/internal/utils"
+	"github.com/crashappsec/ocular/api/v1beta1"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -24,6 +25,13 @@ import (
 )
 
 type Git struct{}
+
+type GitMetadata struct {
+	Ref      string `json:"ref,omitempty"`
+	Hash     string `json:"hash,omitempty"`
+	CloneURL string `json:"clone_url,omitempty"`
+	Public   bool   `json:"public,omitempty"`
+}
 
 var _ Downloader = Git{}
 
@@ -89,7 +97,7 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 			"+HEAD:refs/remotes/origin/HEAD",
 			"+refs/heads/*:refs/remotes/origin/*",
 		},
-		Progress: os.Stderr,
+		Progress: utils.NewLogWriter(l),
 	})
 	switch {
 	case errors.Is(err, gogit.NoErrAlreadyUpToDate):
@@ -103,31 +111,42 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 
 	l.Info("cloned Git repository")
 
-	var checkoutOptions *gogit.CheckoutOptions
+	metadata := GitMetadata{
+		CloneURL: cloneURL,
+	}
+
+	var (
+		checkoutOptions *gogit.CheckoutOptions
+		ref             *plumbing.Reference
+	)
 	switch {
 	case version == "":
-		ref, err := repo.Reference(plumbing.NewRemoteHEADReferenceName("origin"), true)
+		ref, err = repo.Reference(plumbing.NewRemoteHEADReferenceName("origin"), true)
 		if err != nil {
 			l.Error(err, "failed to resolve Git HEAD ref, defaulting to main")
 			checkoutOptions = &gogit.CheckoutOptions{
 				Branch: plumbing.NewRemoteReferenceName("origin", "main"),
 			}
+			metadata.Ref = "main"
 		} else {
 			l.Info("resolved Git HEAD ref", "ref", ref.Name().String())
 			checkoutOptions = &gogit.CheckoutOptions{
 				Branch: ref.Name(),
 			}
+			metadata.Ref = ref.Name().String()
 		}
 	case plumbing.IsHash(version):
 		l = l.WithValues("hash", version)
 		checkoutOptions = &gogit.CheckoutOptions{
 			Hash: plumbing.NewHash(version),
 		}
+		metadata.Hash = version
 	default:
 		l = l.WithValues("branch", version)
 		checkoutOptions = &gogit.CheckoutOptions{
 			Branch: plumbing.NewBranchReferenceName(version),
 		}
+		metadata.Ref = version
 	}
 	l.Info("checking out revision")
 
@@ -136,5 +155,21 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 		return err
 	}
 
-	return worktree.Checkout(checkoutOptions)
+	if err = worktree.Checkout(checkoutOptions); err != nil {
+		return err
+	}
+
+	if err = writeJSONStruct(GitMetadataPath, metadata); err != nil {
+		l.Error(err, "failed to write git metadata")
+	}
+
+	return nil
+}
+
+const GitMetadataPath = v1beta1.PipelineMetadataDirectory + "/git.json"
+
+func (g Git) GetMetadataFiles() []string {
+	return []string{
+		GitMetadataPath,
+	}
 }

@@ -1,30 +1,30 @@
 apiVersion: ocular.crashoverride.run/v1beta1
 kind: Crawler
 metadata:
-  name: gitlab
+  name: ecr
 spec:
   container:
-    env:
-    - name: GITLAB_TOKEN
-      valueFrom:
-        secretKeyRef:
-          key: gitlab-token
-          name: crawlers-secrets
-          optional: true
     image: crawlers
-    name: gitlab
+    name: ecr
     resources: {}
+    volumeMounts:
+    - mountPath: /ocular/aws/config
+      name: crawlers-ecr-file-secrets
+      readOnly: true
+      subPath: aws-config
   parameters:
-  - description: Comma-separated list of GitLab groups to crawl. If empty, the entire
-      instance will be crawled.
-    name: GITLAB_GROUPS
+  - description: AWS region of the ECR repository. Defaults to the region configured
+      in the AWS SDK.
+    name: AWS_REGION
     required: false
-  - description: The base URL of the GitLab instance to crawl. For GitLab.com, use
-      https://gitlab.com/api/v4
-    name: GITLAB_INSTANCE_URL
-    required: true
-  - description: If set, include projects from subgroups of the specified groups.
-    name: INCLUDE_SUBGROUPS
+  - description: ARN of the role to assume for accessing the ECR repository. Optional.
+    name: AWS_PROFILE
+    required: false
+  - default: "1"
+    description: Maximum number of tags (versions) to retrieve per image. Will retrieve
+      the latest N tags for each ECR image and start a new pipeline for each. Set
+      to 0 to retrieve all versions. Defaults to 1.
+    name: RECENT_TAG_LIMIT
     required: false
   - description: Profile to use for the pipelines created from this crawler.
     name: PROFILE
@@ -49,3 +49,8 @@ spec:
       from this crawler.
     name: UPLOAD_SERVICE_ACCOUNT
     required: false
+  volumes:
+  - name: crawlers-ecr-file-secrets
+    secret:
+      optional: true
+      secretName: crawlers-secrets

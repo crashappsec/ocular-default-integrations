@@ -29,6 +29,9 @@ type CrawledTarget struct {
 var AllCrawlers = []Crawler{
 	GitHubOrg{},
 	GitLab{},
+	GHCR{},
+	ECR{},
+	Dockerhub{},
 	StaticList{},
 }
 

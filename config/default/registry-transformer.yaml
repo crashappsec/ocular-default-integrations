@@ -1,0 +1,13 @@
+apiVersion: builtin
+kind: PrefixSuffixTransformer
+metadata:
+  name: setRegistry
+prefix: ghcr.io/crashappsec/ocular-default-
+suffix: :latest
+fieldSpecs:
+  - kind: Crawler
+    path: spec/container/image
+  - kind: Downloader
+    path: spec/container/image
+  - kind: Uploader
+    path: spec/container/image
