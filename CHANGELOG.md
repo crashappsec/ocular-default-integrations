@@ -1,7 +1,22 @@
 # Ocular Default Integrations Release Notes
 <!-- https://keepachangelog.com -->
 
-# [v0.1.3](https://github.com/crashappsec/ocular/releases/tag/v0.1.2) - **October 1, 2025**
+
+# [v0.1.4](https://github.com/crashappsec/ocular/releases/tag/v0.1.4) - **November 13, 2025**
+
+### Added
+
+- The docker and git downloader now support writing metadata files alongside downloaded artifacts.
+  - For docker, this includes a `docker.json` and `chalk.json` (if image is [chalked](www.chalkproject.io)).
+  - For git, this includes a `git.json` file with repository metadata.
+- New Dockerhub, GHCR and ECR crawlers that will enumerate container images from Dockerhub repositories,
+  GitHub Container Registries and AWS Elastic Container Registries respectively.
+  - It will start pipelines for the N most recently updated tags for each image.
+- Github and GitLab crawlers now support ignoring forked repositories.
+- S3 file key for uploads can now be templated using Go templates.
+
+
+# [v0.1.3](https://github.com/crashappsec/ocular/releases/tag/v0.1.3) - **October 1, 2025**
 
 ### Added
 - Added ability to specify scan/upload service accounts for all default crawlers
