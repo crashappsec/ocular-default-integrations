@@ -2,6 +2,13 @@
 <!-- https://keepachangelog.com -->
 
 
+# [v0.1.5](https://github.com/crashappsec/ocular/releases/tag/v0.1.5) - **December 3, 2025**
+
+### Fixed
+
+- Git downloader now writes object files with permission `0644` to allow any other containers/processes to read them.
+
+
 # [v0.1.4](https://github.com/crashappsec/ocular/releases/tag/v0.1.4) - **November 13, 2025**
 
 ### Added
