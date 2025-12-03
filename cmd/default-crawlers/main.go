@@ -69,6 +69,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if crawlerOverride := os.Getenv("OCULAR_CRAWLER_NAME_OVERRIDE"); crawlerOverride != "" {
+		crawlerName = crawlerOverride
+	}
+
 	namespace := os.Getenv(v1beta1.EnvVarNamespaceName)
 
 	var crawler crawlers.Crawler

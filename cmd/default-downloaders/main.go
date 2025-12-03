@@ -54,6 +54,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if downloaderOverride := os.Getenv("OCULAR_DOWNLOADER_NAME_OVERRIDE"); downloaderOverride != "" {
+		downloaderName = downloaderOverride
+	}
+
 	l := logger.WithValues(
 		"target_dir", targetDir,
 		"downloader", downloaderName,

@@ -12,14 +12,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/internal/utils"
 	"github.com/crashappsec/ocular/api/v1beta1"
-	gogit "github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport"
+	gogit "github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
+	format "github.com/go-git/go-git/v6/plumbing/format/config"
+	"github.com/go-git/go-git/v6/plumbing/transport"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -65,38 +69,32 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 		return err
 	}
 
-	repoCfg, err := repo.Config()
+	cfg, err := repo.Config()
 	if err != nil {
 		return err
 	}
+	cfg.Raw.SetOption("core", "", "sharedRepository", "all")
+	cfg.Core.RepositoryFormatVersion = format.Version_0
 
-	// Parse /etc/gitconfig
-	cfg, err := config.LoadConfig(config.SystemScope)
+	err = repo.SetConfig(cfg)
 	if err != nil {
-		l.Info("failed to load config - ignore this if no config was set", "error", err)
-	} else {
-		cfg.Core = repoCfg.Core
-
-		if err := repo.Storer.SetConfig(cfg); err != nil {
-			return err
-		}
+		return err
 	}
 
 	// Add remote and fetch
 	_, err = repo.CreateRemote(&config.RemoteConfig{
 		Name: "origin",
 		URLs: []string{cloneURL},
+		Fetch: []config.RefSpec{
+			"+HEAD:refs/remotes/origin/HEAD",
+			"+refs/*:refs/*",
+		},
 	})
 	if err != nil {
 		return err
 	}
 
 	err = repo.FetchContext(ctx, &gogit.FetchOptions{
-		RemoteName: "origin",
-		RefSpecs: []config.RefSpec{
-			"+HEAD:refs/remotes/origin/HEAD",
-			"+refs/heads/*:refs/remotes/origin/*",
-		},
 		Progress: utils.NewLogWriter(l),
 	})
 	switch {
@@ -115,40 +113,15 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 		CloneURL: cloneURL,
 	}
 
-	var (
-		checkoutOptions *gogit.CheckoutOptions
-		ref             *plumbing.Reference
-	)
-	switch {
-	case version == "":
-		ref, err = repo.Reference(plumbing.NewRemoteHEADReferenceName("origin"), true)
-		if err != nil {
-			l.Error(err, "failed to resolve Git HEAD ref, defaulting to main")
-			checkoutOptions = &gogit.CheckoutOptions{
-				Branch: plumbing.NewRemoteReferenceName("origin", "main"),
-			}
-			metadata.Ref = "main"
-		} else {
-			l.Info("resolved Git HEAD ref", "ref", ref.Name().String())
-			checkoutOptions = &gogit.CheckoutOptions{
-				Branch: ref.Name(),
-			}
-			metadata.Ref = ref.Name().String()
-		}
-	case plumbing.IsHash(version):
-		l = l.WithValues("hash", version)
-		checkoutOptions = &gogit.CheckoutOptions{
-			Hash: plumbing.NewHash(version),
-		}
-		metadata.Hash = version
-	default:
-		l = l.WithValues("branch", version)
-		checkoutOptions = &gogit.CheckoutOptions{
-			Branch: plumbing.NewBranchReferenceName(version),
-		}
-		metadata.Ref = version
+	checkoutOptions, err := getGitCheckoutOption(ctx, repo, version)
+	if err != nil {
+		return err
 	}
-	l.Info("checking out revision")
+
+	metadata.Ref = checkoutOptions.Branch.String()
+	metadata.Hash = checkoutOptions.Hash.String()
+
+	l.Info("checking out revision", "ref", checkoutOptions.Branch, "hash", checkoutOptions.Hash)
 
 	worktree, err := repo.Worktree()
 	if err != nil {
@@ -163,7 +136,69 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 		l.Error(err, "failed to write git metadata")
 	}
 
+	// TODO(bryce): This is due to go-git creating object files without respecting sharedRepository
+	// This needs to be fixed in go-git
+	// See: https://github.com/go-git/go-git/issues/1572
+	err = filepath.WalkDir(".git/objects", chmodRecursive)
+	if err != nil {
+		l.Error(err, "failed to set permissions on .git directory")
+	}
 	return nil
+}
+
+func chmodRecursive(path string, e fs.DirEntry, err error) error {
+	if err != nil {
+		return err
+	}
+
+	if e.IsDir() {
+		return nil
+	}
+
+	return os.Chmod(path, 0o644)
+}
+
+func getGitCheckoutOption(ctx context.Context, repo *gogit.Repository, version string) (*gogit.CheckoutOptions, error) {
+	l := log.FromContext(ctx)
+	var (
+		checkoutOptions *gogit.CheckoutOptions
+		ref             *plumbing.Reference
+		err             error
+	)
+
+	switch {
+	case version == "":
+		ref, err = repo.Reference(plumbing.NewRemoteHEADReferenceName("origin"), true)
+		if err != nil {
+			l.Info("failed to find HEAD ref, using default branch")
+			return &gogit.CheckoutOptions{
+				Branch: plumbing.NewRemoteReferenceName("origin", "main"),
+			}, nil
+		}
+	case plumbing.IsHash(version):
+		ref = plumbing.NewHashReference("", plumbing.NewHash(version))
+	default:
+		ref, err = repo.Reference(plumbing.NewRemoteReferenceName("origin", version), false)
+		if err != nil {
+			return nil, err
+		}
+	}
+	l.Info("resolved reference", "type", ref.Type(), "name", ref.Name(), "hash", ref.Hash(), "target", ref.Target())
+
+	switch ref.Type() {
+	case plumbing.SymbolicReference:
+		checkoutOptions = &gogit.CheckoutOptions{
+			Branch: ref.Target(),
+		}
+	case plumbing.HashReference:
+		checkoutOptions = &gogit.CheckoutOptions{
+			Hash: ref.Hash(),
+		}
+	default:
+		return nil, fmt.Errorf("unsupported reference type: %s", ref.Type())
+	}
+
+	return checkoutOptions, nil
 }
 
 const GitMetadataPath = v1beta1.PipelineMetadataDirectory + "/git.json"
