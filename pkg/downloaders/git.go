@@ -170,7 +170,7 @@ func getGitCheckoutOption(ctx context.Context, repo *gogit.Repository, version s
 	case version == "":
 		ref, err = repo.Reference(plumbing.NewRemoteHEADReferenceName("origin"), true)
 		if err != nil {
-			l.Info(fmt.Sprintf("failed to find HEAD ref, using default branch", version))
+			l.Info("failed to find HEAD ref, using default branch")
 			return &gogit.CheckoutOptions{
 				Branch: plumbing.NewRemoteReferenceName("origin", "main"),
 			}, nil

@@ -81,16 +81,17 @@ func (GitHubOrg) GetParameters() []v1beta1.ParameterDefinition {
 // [DownloaderParamName] to a different value. The GitHub token can be
 // set by setting the secret [GithubTokenParam].
 func (GitHubOrg) Crawl(
-	ctx context.Context,
+	baseCtx context.Context,
 	params map[string]string,
 	queue chan CrawledTarget,
 ) error {
-	l := log.FromContext(ctx).WithValues("crawler", "github")
+	l := log.FromContext(baseCtx).WithValues("crawler", "github")
+	ctx := log.IntoContext(baseCtx, l)
 	// retrieve params
 	orgs := strings.Split(params[GitHubOrgsParamName], ",")
 	token := os.Getenv(GitHubTokenSecretEnvVar)
 	skipForksParam := strings.ToLower(params[GitHubSkipForksParamName])
-	skipForks := skipForksParam != "0" && skipForksParam != "false" && skipForksParam != ""
+	skipForks := skipForksParam != "" && skipForksParam != "0" && skipForksParam != "false"
 	downloader := downloaders.Git{}.GetName()
 
 	client := github.NewClient(nil)

@@ -62,6 +62,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if uploaderOverride := os.Getenv("OCULAR_UPLOADER_NAME_OVERRIDE"); uploaderOverride != "" {
+		uploaderName = uploaderOverride
+	}
+
 	l := logger.WithValues(
 		"results_dir", resultsDir,
 		"uploader", uploaderName,
