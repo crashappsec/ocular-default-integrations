@@ -11,12 +11,14 @@ package crawlers
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
+	"github.com/crashappsec/ocular-default-integrations/internal/utils"
 	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/google/go-github/v71/github"
@@ -36,6 +38,9 @@ func (GitHubOrg) GetName() string {
 
 const (
 	GitHubTokenSecretEnvVar = "GITHUB_TOKEN"
+	GitHubAppInstallationID = "GITHUB_APP_INSTALLATION_ID"
+	GitHubAppID             = "GITHUB_APP_ID"
+	GitHubAppPrivateKey     = "GITHUB_APP_PRIVATE_KEY"
 )
 
 func (o GitHubOrg) GetEnvSecrets() []definitions.EnvironmentSecret {
@@ -43,6 +48,18 @@ func (o GitHubOrg) GetEnvSecrets() []definitions.EnvironmentSecret {
 		{
 			SecretKey:  "github-token",
 			EnvVarName: GitHubTokenSecretEnvVar,
+		},
+		{
+			SecretKey:  "github-app-installation-id",
+			EnvVarName: GitHubAppInstallationID,
+		},
+		{
+			SecretKey:  "github-app-private-key",
+			EnvVarName: GitHubAppPrivateKey,
+		},
+		{
+			SecretKey:  "github-app-id",
+			EnvVarName: GitHubAppID,
 		},
 	}
 }
@@ -89,21 +106,19 @@ func (GitHubOrg) Crawl(
 	ctx := log.IntoContext(baseCtx, l)
 	// retrieve params
 	orgs := strings.Split(params[GitHubOrgsParamName], ",")
-	token := os.Getenv(GitHubTokenSecretEnvVar)
 	skipForksParam := strings.ToLower(params[GitHubSkipForksParamName])
 	skipForks := skipForksParam != "" && skipForksParam != "0" && skipForksParam != "false"
 	downloader := downloaders.Git{}.GetName()
 
-	client := github.NewClient(nil)
-	if token != "" {
-		client = client.WithAuthToken(token)
-	}
+	l.Info("starting github org crawler", "orgs", orgs, "skipForks", skipForks)
+	client := createGitHubClient(ctx)
 	if len(orgs) == 0 {
 		return fmt.Errorf("no github org specified")
 	}
 
 	var merr *multierror.Error
 	for _, org := range orgs {
+		l.Info("crawling github org", "org", org)
 		if err := crawlOrg(ctx, client, org, downloader, skipForks, queue); err != nil {
 			l.Error(err, "Error crawling org", "org", org)
 			merr = multierror.Append(merr, err)
@@ -111,6 +126,43 @@ func (GitHubOrg) Crawl(
 	}
 
 	return merr.ErrorOrNil()
+}
+
+func createGitHubClient(ctx context.Context) *github.Client {
+	l := log.FromContext(ctx)
+	installationIDStr := os.Getenv(GitHubAppInstallationID)
+	appIDStr := os.Getenv(GitHubAppID)
+	privateKey := os.Getenv(GitHubAppPrivateKey)
+	token := os.Getenv(GitHubTokenSecretEnvVar)
+
+	if installationIDStr != "" && privateKey != "" && appIDStr != "" {
+		l.Info("authenticating using GitHub App")
+		appID, appIDErr := strconv.ParseInt(appIDStr, 10, 64)
+		if appIDErr != nil {
+			l.Error(appIDErr, "failed to parse GitHub App ID")
+		}
+		installationID, installationIDErr := strconv.ParseInt(installationIDStr, 10, 64)
+		if installationIDErr != nil {
+			l.Error(installationIDErr, "failed to parse GitHub Installation ID")
+		}
+		if installationIDErr == nil && appIDErr == nil {
+			// both parsed successfully, if not fall through to token auth
+			itr, err := utils.AuthenticateGitHubApp(ctx, appID, installationID, []byte(privateKey))
+			if err != nil {
+				l.Error(err, "failed to authenticate GitHub App")
+			} else {
+				return github.NewClient(&http.Client{Transport: itr})
+			}
+		}
+	}
+
+	if token != "" {
+		l.Info("authenticating using GitHub Token")
+		return github.NewClient(nil).WithAuthToken(token)
+	}
+
+	l.Info("no GitHub authentication configured, proceeding unauthenticated")
+	return github.NewClient(nil)
 }
 
 func crawlOrg(

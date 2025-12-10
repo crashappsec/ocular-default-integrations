@@ -15,6 +15,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/internal/utils"
@@ -24,7 +25,9 @@ import (
 	"github.com/go-git/go-git/v6/plumbing"
 	format "github.com/go-git/go-git/v6/plumbing/format/config"
 	"github.com/go-git/go-git/v6/plumbing/transport"
+	"github.com/go-git/go-git/v6/plumbing/transport/http"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -37,6 +40,8 @@ type GitMetadata struct {
 	Public   bool   `json:"public,omitempty"`
 }
 
+const CustomScope = "/etc/ocular/gitconfig"
+
 var _ Downloader = Git{}
 
 func (Git) GetName() string {
@@ -44,14 +49,27 @@ func (Git) GetName() string {
 }
 
 func (Git) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return nil
+	return []definitions.EnvironmentSecret{
+		{
+			SecretKey:  "github-app-installation-id",
+			EnvVarName: GitHubAppInstallationID,
+		},
+		{
+			SecretKey:  "github-app-private-key",
+			EnvVarName: GitHubAppPrivateKeyEnvVar,
+		},
+		{
+			SecretKey:  "github-app-id",
+			EnvVarName: GitHubAppId,
+		},
+	}
 }
 
 func (Git) GetFileSecrets() []definitions.FileSecret {
 	return []definitions.FileSecret{
 		{
 			SecretKey: "gitconfig",
-			MountPath: "/etc/gitconfig",
+			MountPath: CustomScope,
 		},
 	}
 }
@@ -76,9 +94,29 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 	cfg.Raw.SetOption("core", "", "sharedRepository", "all")
 	cfg.Core.RepositoryFormatVersion = format.Version_0
 
+	if f, err := os.Stat(CustomScope); err == nil && !f.IsDir() {
+		l.Info("applying custom git config", "path", CustomScope)
+		f, err := os.Open(CustomScope)
+		if err != nil {
+			l.Error(err, "failed to open custom git config", "path", CustomScope)
+		} else {
+			customCfg, err := config.ReadConfig(f)
+			if err != nil {
+				l.Error(err, "failed to read custom git config", "path", CustomScope)
+			} else {
+				cfg = ptr.To(config.Merge(cfg, customCfg))
+			}
+		}
+	}
+
+	auth, err := handleAuthentication(ctx)
+	if err != nil {
+		l.Error(err, "failed to authenticate")
+	}
+
 	err = repo.SetConfig(cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to set custom git config: %w", err)
 	}
 
 	// Add remote and fetch
@@ -96,6 +134,7 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 
 	err = repo.FetchContext(ctx, &gogit.FetchOptions{
 		Progress: utils.NewLogWriter(l),
+		Auth:     auth,
 	})
 	switch {
 	case errors.Is(err, gogit.NoErrAlreadyUpToDate):
@@ -144,6 +183,41 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 		l.Error(err, "failed to set permissions on .git directory")
 	}
 	return nil
+}
+
+const (
+	GitHubAppPrivateKeyEnvVar = "GITHUB_APP_PRIVATE_KEY"
+	GitHubAppInstallationID   = "GITHUB_APP_INSTALLATION_ID"
+	GitHubAppId               = "GITHUB_APP_ID"
+)
+
+func handleAuthentication(ctx context.Context) (transport.AuthMethod, error) {
+	l := log.FromContext(ctx)
+
+	githubPrivateKey := os.Getenv(GitHubAppPrivateKeyEnvVar)
+	githubInstallationID, installationIDErr := strconv.ParseInt(os.Getenv(GitHubAppInstallationID), 10, 64)
+	githubAppID, appIDErr := strconv.ParseInt(os.Getenv(GitHubAppId), 10, 64)
+
+	if githubPrivateKey != "" && appIDErr == nil && installationIDErr == nil {
+		l.Info("configuring GitHub App authentication for git client")
+		itr, err := utils.AuthenticateGitHubApp(ctx, githubAppID, githubInstallationID, []byte(githubPrivateKey))
+		if err != nil {
+			l.Error(err, "failed to authenticate GitHub App")
+			return nil, err
+		}
+		token, err := itr.Token(ctx)
+		if err != nil {
+			l.Error(err, "failed to get GitHub App token")
+			return nil, err
+		}
+		return &http.BasicAuth{
+			Username: "x-access-token",
+			Password: token,
+		}, nil
+	}
+
+	return nil, nil
+
 }
 
 func chmodRecursive(path string, e fs.DirEntry, err error) error {
