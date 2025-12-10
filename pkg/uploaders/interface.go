@@ -37,7 +37,7 @@ type Uploader interface {
 	EnvironmentVariables() []corev1.EnvVar
 }
 
-func GenerateObjects(image string) []*v1beta1.Uploader {
+func GenerateObjects(image, secretName string) []*v1beta1.Uploader {
 	uploaderObjs := make([]*v1beta1.Uploader, 0, len(AllUploaders))
 	for _, u := range AllUploaders {
 		params := u.GetParameters()
@@ -63,11 +63,11 @@ func GenerateObjects(image string) []*v1beta1.Uploader {
 		}
 
 		if envSecrets := u.GetEnvSecrets(); envSecrets != nil {
-			uploaderObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars("uploaders", envSecrets)
+			uploaderObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars(secretName, envSecrets)
 		}
 
 		if fileSecrets := u.GetFileSecrets(); fileSecrets != nil {
-			volume, mounts := definitions.FileSecretsToVolumeMounts("uploaders", u.GetName(), fileSecrets)
+			volume, mounts := definitions.FileSecretsToVolumeMounts(secretName, u.GetName(), fileSecrets)
 			uploaderObj.Spec.Volumes = append(uploaderObj.Spec.Volumes, volume)
 			uploaderObj.Spec.Container.VolumeMounts = append(uploaderObj.Spec.Container.VolumeMounts, mounts...)
 		}

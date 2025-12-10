@@ -13,9 +13,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/internal/utils"
@@ -50,10 +52,6 @@ func (Git) GetName() string {
 
 func (Git) GetEnvSecrets() []definitions.EnvironmentSecret {
 	return []definitions.EnvironmentSecret{
-		{
-			SecretKey:  "github-app-installation-id",
-			EnvVarName: GitHubAppInstallationID,
-		},
 		{
 			SecretKey:  "github-app-private-key",
 			EnvVarName: GitHubAppPrivateKeyEnvVar,
@@ -109,7 +107,7 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 		}
 	}
 
-	auth, err := handleAuthentication(ctx)
+	auth, err := handleAuthentication(ctx, cloneURL)
 	if err != nil {
 		l.Error(err, "failed to authenticate")
 	}
@@ -187,20 +185,38 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 
 const (
 	GitHubAppPrivateKeyEnvVar = "GITHUB_APP_PRIVATE_KEY"
-	GitHubAppInstallationID   = "GITHUB_APP_INSTALLATION_ID"
 	GitHubAppId               = "GITHUB_APP_ID"
 )
 
-func handleAuthentication(ctx context.Context) (transport.AuthMethod, error) {
+func handleAuthentication(ctx context.Context, rawCloneURL string) (transport.AuthMethod, error) {
 	l := log.FromContext(ctx)
 
+	cloneURL, err := url.Parse(rawCloneURL)
+	if err != nil {
+		l.Error(err, "failed to parse clone URL for authentication")
+		return nil, err
+	}
+
+	isGitHub := cloneURL.Host == "github.com"
 	githubPrivateKey := os.Getenv(GitHubAppPrivateKeyEnvVar)
-	githubInstallationID, installationIDErr := strconv.ParseInt(os.Getenv(GitHubAppInstallationID), 10, 64)
+
 	githubAppID, appIDErr := strconv.ParseInt(os.Getenv(GitHubAppId), 10, 64)
 
-	if githubPrivateKey != "" && appIDErr == nil && installationIDErr == nil {
+	fmt.Println("is github", isGitHub)
+	fmt.Println("githubAppID", os.Getenv(GitHubAppId))
+	fmt.Println("appIDErr", appIDErr)
+	fmt.Println("private-key", githubPrivateKey != "")
+
+	if isGitHub && githubPrivateKey != "" && appIDErr == nil {
 		l.Info("configuring GitHub App authentication for git client")
-		itr, err := utils.AuthenticateGitHubApp(ctx, githubAppID, githubInstallationID, []byte(githubPrivateKey))
+		path := strings.Split(strings.Trim(cloneURL.Path, "/"), "/")
+		if len(path) != 2 {
+			l.Error(err, "failed to extract owner/repo from clone URL for GitHub App authentication")
+			return nil, fmt.Errorf("invalid GitHub repository URL: %s", rawCloneURL)
+		}
+		owner := strings.TrimPrefix(path[0], "/")
+		repo := strings.TrimSuffix(path[1], ".git")
+		itr, err := utils.AuthenticateGitHubAppForRepository(ctx, owner, repo, githubAppID, []byte(githubPrivateKey))
 		if err != nil {
 			l.Error(err, "failed to authenticate GitHub App")
 			return nil, err

@@ -32,14 +32,17 @@ fi
 if [ ! -f "$CHART_DIRECTORY/values.yaml" ]; then
   cat >"$CHART_DIRECTORY/values.yaml" <<EOF
 crawlers:
+  secretName: "crawler-secrets"
   image:
     repository: "ghcr.io/crashappsec/ocular-default-crawlers"
     tag: "${OCULAR_DEFAULTS_VERSION:-latest}"
 downloaders:
+  secretName: "downloader-secrets"
   image:
     repository: "ghcr.io/crashappsec/ocular-default-downloaders"
     tag: "${OCULAR_DEFAULTS_VERSION:-latest}"
 uploaders:
+  secretName: "uploader-secrets"
   image:
     repository: "ghcr.io/crashappsec/ocular-default-uploaders"
     tag: "${OCULAR_DEFAULTS_VERSION:-latest}"
@@ -49,12 +52,14 @@ else
   yq -ie ".downloaders.image.tag = \"${OCULAR_DEFAULTS_VERSION:-latest}\"" "$CHART_DIRECTORY/values.yaml"
   yq -ie ".uploaders.image.tag = \"${OCULAR_DEFAULTS_VERSION:-latest}\"" "$CHART_DIRECTORY/values.yaml"
 fi
-resource_kinds=("crawlers" "downloaders" "uploaders")
+resource_kinds=("crawler" "downloader" "uploader")
 
 for kind in "${resource_kinds[@]}"; do
-  kind_templates_dir="$CHART_DIRECTORY/templates/$kind"
+  kind_templates_dir="$CHART_DIRECTORY/templates/${kind}s"
   mkdir -p "$kind_templates_dir"
-  (cd "$kind_templates_dir" && "${ROOT_DIRECTORY}/bin/kustomize" build "$ROOT_DIRECTORY/config/$kind" | yq ".spec.container.image = \"{{ .Values.$kind.image.repository }}:{{ .Values.$kind.image.tag }}\"" -s '.metadata.name + ".yaml"')
+  (cd "$kind_templates_dir" && "${ROOT_DIRECTORY}/bin/kustomize" build "$ROOT_DIRECTORY/config/${kind}s" \
+    | sed -e "s/${kind}-secrets/\"{{ .Values.${kind}s.secretName }}\"/g" \
+    | yq ".spec.container.image = \"{{ .Values.${kind}s.image.repository }}:{{ .Values.${kind}s.image.tag }}\"" -s '.metadata.name + ".yaml"')
 done
 
 

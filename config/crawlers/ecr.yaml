@@ -9,7 +9,7 @@ spec:
     resources: {}
     volumeMounts:
     - mountPath: /ocular/aws/config
-      name: crawlers-ecr-file-secrets
+      name: ecr-file-secrets
       readOnly: true
       subPath: aws-config
   parameters:
@@ -50,7 +50,7 @@ spec:
     name: UPLOAD_SERVICE_ACCOUNT
     required: false
   volumes:
-  - name: crawlers-ecr-file-secrets
+  - name: ecr-file-secrets
     secret:
       optional: true
-      secretName: crawlers-secrets
+      secretName: crawler-secrets

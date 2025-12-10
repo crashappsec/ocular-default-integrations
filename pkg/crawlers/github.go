@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/internal/utils"
 	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
@@ -38,7 +39,6 @@ func (GitHubOrg) GetName() string {
 
 const (
 	GitHubTokenSecretEnvVar = "GITHUB_TOKEN"
-	GitHubAppInstallationID = "GITHUB_APP_INSTALLATION_ID"
 	GitHubAppID             = "GITHUB_APP_ID"
 	GitHubAppPrivateKey     = "GITHUB_APP_PRIVATE_KEY"
 )
@@ -48,10 +48,6 @@ func (o GitHubOrg) GetEnvSecrets() []definitions.EnvironmentSecret {
 		{
 			SecretKey:  "github-token",
 			EnvVarName: GitHubTokenSecretEnvVar,
-		},
-		{
-			SecretKey:  "github-app-installation-id",
-			EnvVarName: GitHubAppInstallationID,
 		},
 		{
 			SecretKey:  "github-app-private-key",
@@ -111,15 +107,27 @@ func (GitHubOrg) Crawl(
 	downloader := downloaders.Git{}.GetName()
 
 	l.Info("starting github org crawler", "orgs", orgs, "skipForks", skipForks)
-	client := createGitHubClient(ctx)
 	if len(orgs) == 0 {
 		return fmt.Errorf("no github org specified")
+	}
+
+	// globalClient is only used to determine if the org is a user or organization
+	globalClient := github.NewClient(nil)
+	if token := os.Getenv(GitHubTokenSecretEnvVar); token != "" {
+		globalClient = globalClient.WithAuthToken(token)
 	}
 
 	var merr *multierror.Error
 	for _, org := range orgs {
 		l.Info("crawling github org", "org", org)
-		if err := crawlOrg(ctx, client, org, downloader, skipForks, queue); err != nil {
+		isUser, err := isGitHubUser(ctx, globalClient, org)
+		if err != nil {
+			l.Error(err, "Error determining if org is an organization or user", "org", org)
+			merr = multierror.Append(merr, err)
+			continue
+		}
+		client := createGitHubClientForOrg(ctx, org, isUser)
+		if err := crawlOrg(ctx, client, org, downloader, isUser, skipForks, queue); err != nil {
 			l.Error(err, "Error crawling org", "org", org)
 			merr = multierror.Append(merr, err)
 		}
@@ -128,31 +136,34 @@ func (GitHubOrg) Crawl(
 	return merr.ErrorOrNil()
 }
 
-func createGitHubClient(ctx context.Context) *github.Client {
+// createGitHubClientForOrg creates a GitHub client authenticated for the given organization.
+// It first attempts to authenticate using a GitHub App if the necessary environment variables are set.
+// If that fails or is not configured, it falls back to using a personal access token.
+// If neither method is available, it creates an unauthenticated client.
+// The isUser parameter indicates whether the target is a user or an organization.
+func createGitHubClientForOrg(ctx context.Context, org string, isUser bool) *github.Client {
 	l := log.FromContext(ctx)
-	installationIDStr := os.Getenv(GitHubAppInstallationID)
-	appIDStr := os.Getenv(GitHubAppID)
+
 	privateKey := os.Getenv(GitHubAppPrivateKey)
+	appID, appIDErr := strconv.ParseInt(os.Getenv(GitHubAppID), 10, 64)
 	token := os.Getenv(GitHubTokenSecretEnvVar)
 
-	if installationIDStr != "" && privateKey != "" && appIDStr != "" {
+	if privateKey != "" && appIDErr == nil {
 		l.Info("authenticating using GitHub App")
-		appID, appIDErr := strconv.ParseInt(appIDStr, 10, 64)
-		if appIDErr != nil {
-			l.Error(appIDErr, "failed to parse GitHub App ID")
+		// both parsed successfully, if not fall through to token auth
+		var (
+			itr *ghinstallation.Transport
+			err error
+		)
+		if isUser {
+			itr, err = utils.AuthenticateGitHubAppForUser(ctx, org, appID, []byte(privateKey))
+		} else {
+			itr, err = utils.AuthenticateGitHubAppForOrg(ctx, org, appID, []byte(privateKey))
 		}
-		installationID, installationIDErr := strconv.ParseInt(installationIDStr, 10, 64)
-		if installationIDErr != nil {
-			l.Error(installationIDErr, "failed to parse GitHub Installation ID")
-		}
-		if installationIDErr == nil && appIDErr == nil {
-			// both parsed successfully, if not fall through to token auth
-			itr, err := utils.AuthenticateGitHubApp(ctx, appID, installationID, []byte(privateKey))
-			if err != nil {
-				l.Error(err, "failed to authenticate GitHub App")
-			} else {
-				return github.NewClient(&http.Client{Transport: itr})
-			}
+		if err != nil {
+			l.Error(err, "failed to authenticate GitHub App, falling back to token auth if available")
+		} else {
+			return github.NewClient(&http.Client{Transport: itr})
 		}
 	}
 
@@ -169,40 +180,34 @@ func crawlOrg(
 	ctx context.Context,
 	c *github.Client,
 	org, dl string,
+	isUser bool,
 	skipForks bool,
 	queue chan CrawledTarget,
 ) error {
 	l := log.FromContext(ctx)
 
 	l.Info("crawling github org", "org", org)
-	// check if org is org or user
-	user, _, err := c.Users.Get(ctx, org)
-	if err != nil {
-		return fmt.Errorf("error getting org info: %w", err)
-	}
-
-	isOrg := user.GetType() == "Organization"
-	l = l.WithValues(
-		"org", org,
-		"org_type", user.GetType())
 
 	l.Info("beginning to crawl github repositories")
-	opt := github.ListOptions{PerPage: 100}
+	var (
+		opt = github.ListOptions{PerPage: 100}
+		err error
+	)
 	for {
 		var (
 			repos []*github.Repository
 			resp  *github.Response
 		)
-		if isOrg {
-			repos, resp, err = c.Repositories.ListByOrg(
-				ctx,
-				org,
-				&github.RepositoryListByOrgOptions{
-					ListOptions: opt,
-				},
-			)
+		if isUser {
+			var results *github.RepositoriesSearchResult
+			results, resp, err = c.Search.Repositories(ctx, fmt.Sprintf("user:%s", org), &github.SearchOptions{
+				ListOptions: opt,
+			})
+			if err == nil {
+				repos = results.Repositories
+			}
 		} else {
-			repos, resp, err = c.Repositories.ListByUser(ctx, org, &github.RepositoryListByUserOptions{
+			repos, resp, err = c.Repositories.ListByOrg(ctx, org, &github.RepositoryListByOrgOptions{
 				ListOptions: opt,
 			})
 		}
@@ -247,4 +252,22 @@ func crawlOrg(
 	}
 	l.Info("crawling complete")
 	return nil
+}
+
+// isGitHubUser checks if the given name corresponds to a GitHub user.
+// if not, it is assumed to be an organization account.
+func isGitHubUser(ctx context.Context, c *github.Client, name string) (bool, error) {
+	l := log.FromContext(ctx)
+	user, _, err := c.Users.Get(ctx, name)
+	if err != nil {
+		return false, fmt.Errorf("error getting user info: %w", err)
+	}
+
+	isUser := user.GetType() == "User"
+	l = l.WithValues(
+		"user", name,
+		"is_user", isUser,
+		"entity_type", user.GetType())
+	l.Info("determined GitHub entity type")
+	return isUser, nil
 }

@@ -9,7 +9,7 @@ spec:
     resources: {}
     volumeMounts:
     - mountPath: /ocular/aws/config
-      name: uploaders-s3-file-secrets
+      name: s3-file-secrets
       readOnly: true
       subPath: aws-config
   parameters:
@@ -30,7 +30,7 @@ spec:
     name: FOLDER_TEMPLATE
     required: false
   volumes:
-  - name: uploaders-s3-file-secrets
+  - name: s3-file-secrets
     secret:
       optional: true
-      secretName: uploaders-secrets
+      secretName: uploader-secrets
