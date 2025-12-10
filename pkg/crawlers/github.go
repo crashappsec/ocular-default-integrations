@@ -110,6 +110,7 @@ func (GitHubOrg) Crawl(
 	skipForks := skipForksParam != "" && skipForksParam != "0" && skipForksParam != "false"
 	downloader := downloaders.Git{}.GetName()
 
+	l.Info("starting github org crawler", "orgs", orgs, "skipForks", skipForks)
 	client := createGitHubClient(ctx)
 	if len(orgs) == 0 {
 		return fmt.Errorf("no github org specified")
@@ -117,6 +118,7 @@ func (GitHubOrg) Crawl(
 
 	var merr *multierror.Error
 	for _, org := range orgs {
+		l.Info("crawling github org", "org", org)
 		if err := crawlOrg(ctx, client, org, downloader, skipForks, queue); err != nil {
 			l.Error(err, "Error crawling org", "org", org)
 			merr = multierror.Append(merr, err)
