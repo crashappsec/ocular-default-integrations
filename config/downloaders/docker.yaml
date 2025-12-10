@@ -12,14 +12,14 @@ spec:
     resources: {}
     volumeMounts:
     - mountPath: /ocular/docker/config.json
-      name: downloaders-docker-file-secrets
+      name: docker-file-secrets
       readOnly: true
       subPath: dockerconfig
   metadataFiles:
   - /mnt/metadata/docker.json
   - /mnt/metadata/chalk.json
   volumes:
-  - name: downloaders-docker-file-secrets
+  - name: docker-file-secrets
     secret:
       optional: true
-      secretName: downloaders-secrets
+      secretName: downloader-secrets

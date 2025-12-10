@@ -35,7 +35,7 @@ type Downloader interface {
 	GetMetadataFiles() []string
 }
 
-func GenerateObjects(image string) []*v1beta1.Downloader {
+func GenerateObjects(image, secretName string) []*v1beta1.Downloader {
 	downloaderObjs := make([]*v1beta1.Downloader, 0, len(AllDownloaders))
 	for _, d := range AllDownloaders {
 		downlaoderObj := &v1beta1.Downloader{
@@ -61,11 +61,11 @@ func GenerateObjects(image string) []*v1beta1.Downloader {
 		}
 
 		if envSecrets := d.GetEnvSecrets(); envSecrets != nil {
-			downlaoderObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars("downloaders", envSecrets)
+			downlaoderObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars(secretName, envSecrets)
 		}
 
 		if fileSecrets := d.GetFileSecrets(); fileSecrets != nil {
-			volume, mounts := definitions.FileSecretsToVolumeMounts("downloaders", d.GetName(), fileSecrets)
+			volume, mounts := definitions.FileSecretsToVolumeMounts(secretName, d.GetName(), fileSecrets)
 			downlaoderObj.Spec.Volumes = append(downlaoderObj.Spec.Volumes, volume)
 			downlaoderObj.Spec.Container.VolumeMounts = append(downlaoderObj.Spec.Container.VolumeMounts, mounts...)
 		}

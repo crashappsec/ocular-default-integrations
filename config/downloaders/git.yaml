@@ -5,36 +5,30 @@ metadata:
 spec:
   container:
     env:
-    - name: GITHUB_APP_INSTALLATION_ID
-      valueFrom:
-        secretKeyRef:
-          key: github-app-installation-id
-          name: downloaders-secrets
-          optional: true
     - name: GITHUB_APP_PRIVATE_KEY
       valueFrom:
         secretKeyRef:
           key: github-app-private-key
-          name: downloaders-secrets
+          name: downloader-secrets
           optional: true
     - name: GITHUB_APP_ID
       valueFrom:
         secretKeyRef:
           key: github-app-id
-          name: downloaders-secrets
+          name: downloader-secrets
           optional: true
     image: downloaders
     name: git
     resources: {}
     volumeMounts:
     - mountPath: /etc/ocular/gitconfig
-      name: downloaders-git-file-secrets
+      name: git-file-secrets
       readOnly: true
       subPath: gitconfig
   metadataFiles:
   - /mnt/metadata/git.json
   volumes:
-  - name: downloaders-git-file-secrets
+  - name: git-file-secrets
     secret:
       optional: true
-      secretName: downloaders-secrets
+      secretName: downloader-secrets

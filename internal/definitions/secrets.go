@@ -23,13 +23,13 @@ type EnvironmentSecret struct {
 	EnvVarName string
 }
 
-func FileSecretsToVolumeMounts(resource, resourceName string, secrets []FileSecret) (v1.Volume, []v1.VolumeMount) {
-	volumeName := resource + "-" + resourceName + "-file-secrets"
+func FileSecretsToVolumeMounts(secretName, resourceName string, secrets []FileSecret) (v1.Volume, []v1.VolumeMount) {
+	volumeName := resourceName + "-file-secrets"
 	volume := v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			Secret: &v1.SecretVolumeSource{
-				SecretName: resource + "-secrets",
+				SecretName: secretName,
 				Optional:   ptr.Bool(true),
 			},
 		},
@@ -47,7 +47,7 @@ func FileSecretsToVolumeMounts(resource, resourceName string, secrets []FileSecr
 	return volume, mounts
 }
 
-func EnvironmentSecretsToEnvVars(resource string, secrets []EnvironmentSecret) []v1.EnvVar {
+func EnvironmentSecretsToEnvVars(secretName string, secrets []EnvironmentSecret) []v1.EnvVar {
 	envVars := make([]v1.EnvVar, 0, len(secrets))
 	for _, secret := range secrets {
 		envVars = append(envVars, v1.EnvVar{
@@ -57,7 +57,7 @@ func EnvironmentSecretsToEnvVars(resource string, secrets []EnvironmentSecret) [
 					Key:      secret.SecretKey,
 					Optional: ptr.Bool(true),
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: resource + "-secrets",
+						Name: secretName,
 					},
 				},
 			},

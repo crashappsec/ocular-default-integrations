@@ -9,25 +9,19 @@ spec:
       valueFrom:
         secretKeyRef:
           key: github-token
-          name: crawlers-secrets
-          optional: true
-    - name: GITHUB_APP_INSTALLATION_ID
-      valueFrom:
-        secretKeyRef:
-          key: github-app-installation-id
-          name: crawlers-secrets
+          name: crawler-secrets
           optional: true
     - name: GITHUB_APP_PRIVATE_KEY
       valueFrom:
         secretKeyRef:
           key: github-app-private-key
-          name: crawlers-secrets
+          name: crawler-secrets
           optional: true
     - name: GITHUB_APP_ID
       valueFrom:
         secretKeyRef:
           key: github-app-id
-          name: crawlers-secrets
+          name: crawler-secrets
           optional: true
     image: crawlers
     name: github

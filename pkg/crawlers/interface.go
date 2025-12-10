@@ -90,7 +90,7 @@ type Crawler interface {
 	EnvironmentVariables() []corev1.EnvVar
 }
 
-func GenerateObjects(image string) []*v1beta1.Crawler {
+func GenerateObjects(image, secretName string) []*v1beta1.Crawler {
 	crawlerObjs := make([]*v1beta1.Crawler, 0, len(AllCrawlers))
 	for _, c := range AllCrawlers {
 		crawlerParams := c.GetParameters()
@@ -130,11 +130,11 @@ func GenerateObjects(image string) []*v1beta1.Crawler {
 		}
 
 		if envSecrets := c.GetEnvSecrets(); envSecrets != nil {
-			crawlerObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars("crawlers", envSecrets)
+			crawlerObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars(secretName, envSecrets)
 		}
 
 		if fileSecrets := c.GetFileSecrets(); fileSecrets != nil {
-			volume, mounts := definitions.FileSecretsToVolumeMounts("crawlers", c.GetName(), fileSecrets)
+			volume, mounts := definitions.FileSecretsToVolumeMounts(secretName, c.GetName(), fileSecrets)
 			crawlerObj.Spec.Volumes = append(crawlerObj.Spec.Volumes, volume)
 			crawlerObj.Spec.Container.VolumeMounts = append(crawlerObj.Spec.Container.VolumeMounts, mounts...)
 		}

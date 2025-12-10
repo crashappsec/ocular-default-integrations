@@ -9,7 +9,7 @@ spec:
       valueFrom:
         secretKeyRef:
           key: dockerhub-token
-          name: crawlers-secrets
+          name: crawler-secrets
           optional: true
     image: crawlers
     name: dockerhub

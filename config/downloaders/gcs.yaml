@@ -9,7 +9,7 @@ spec:
       valueFrom:
         secretKeyRef:
           key: downloader-gcs-credentials
-          name: downloaders-secrets
+          name: downloader-secrets
           optional: true
     image: downloaders
     name: gcs
