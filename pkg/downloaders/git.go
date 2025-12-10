@@ -201,12 +201,6 @@ func handleAuthentication(ctx context.Context, rawCloneURL string) (transport.Au
 	githubPrivateKey := os.Getenv(GitHubAppPrivateKeyEnvVar)
 
 	githubAppID, appIDErr := strconv.ParseInt(os.Getenv(GitHubAppId), 10, 64)
-
-	fmt.Println("is github", isGitHub)
-	fmt.Println("githubAppID", os.Getenv(GitHubAppId))
-	fmt.Println("appIDErr", appIDErr)
-	fmt.Println("private-key", githubPrivateKey != "")
-
 	if isGitHub && githubPrivateKey != "" && appIDErr == nil {
 		l.Info("configuring GitHub App authentication for git client")
 		path := strings.Split(strings.Trim(cloneURL.Path, "/"), "/")
