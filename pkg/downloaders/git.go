@@ -90,7 +90,7 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 		return err
 	}
 	cfg.Raw.SetOption("core", "", "sharedRepository", "all")
-	cfg.Core.RepositoryFormatVersion = format.Version_0
+	cfg.Core.RepositoryFormatVersion = format.Version0
 
 	if f, err := os.Stat(CustomScope); err == nil && !f.IsDir() {
 		l.Info("applying custom git config", "path", CustomScope)
