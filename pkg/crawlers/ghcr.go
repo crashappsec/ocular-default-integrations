@@ -82,11 +82,11 @@ func (g GHCR) Crawl(ctx context.Context, params map[string]string, queue chan Cr
 			l.Error(err, "error retrieving org info", "org", org)
 			merr = multierror.Append(merr, err)
 		}
+		var indexer GHCRPackageIndexer = client.Users
 		if user.GetType() == "Organization" {
-			err = crawlGHCRContainers(ctx, org, downloader, queue, client.Organizations, limit)
-		} else {
-			err = crawlGHCRContainers(ctx, org, downloader, queue, client.Users, limit)
+			indexer = client.Organizations
 		}
+		err = crawlGHCRContainers(ctx, org, downloader, queue, indexer, limit)
 		if err != nil {
 			l.Error(err, "Error crawling org", "org", org)
 			merr = multierror.Append(merr, err)
@@ -96,7 +96,7 @@ func (g GHCR) Crawl(ctx context.Context, params map[string]string, queue chan Cr
 	return merr.ErrorOrNil()
 }
 
-type GHCRPackgeIndexer interface {
+type GHCRPackageIndexer interface {
 	ListPackages(
 		context.Context, string, *github.PackageListOptions,
 	) ([]*github.Package, *github.Response, error)
@@ -109,7 +109,7 @@ func crawlGHCRContainers(
 	ctx context.Context,
 	org, dl string,
 	queue chan CrawledTarget,
-	indexer GHCRPackgeIndexer,
+	indexer GHCRPackageIndexer,
 	tagLimit int,
 ) error {
 	l := log.FromContext(ctx)
@@ -138,7 +138,10 @@ func crawlGHCRContainers(
 					Identifier: targetID,
 					Version:    version,
 				},
-				DefaultDownloader: dl,
+				DefaultDownloader: corev1.ObjectReference{
+					Name: dl,
+					Kind: "ClusterDownloader",
+				},
 			}
 			l.Info("Discovered GHCR container", "identifier", targetID, "version", version)
 			queue <- target
@@ -150,7 +153,7 @@ func crawlGHCRContainers(
 func getRecentGHCRTags(ctx context.Context,
 	org string,
 	packageName string,
-	indexer GHCRPackgeIndexer,
+	indexer GHCRPackageIndexer,
 	tagLimit int,
 ) ([]string, error) {
 	var version []string

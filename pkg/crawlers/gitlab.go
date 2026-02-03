@@ -169,7 +169,10 @@ func crawlGitlabGroup(
 				Target: v1beta1.Target{
 					Identifier: repo.HTTPURLToRepo,
 				},
-				DefaultDownloader: dl,
+				DefaultDownloader: corev1.ObjectReference{
+					Name: dl,
+					Kind: "ClusterDownloader",
+				},
 			}
 		}
 		if resp.NextPage == 0 || resp.NextPage >= resp.TotalPages {

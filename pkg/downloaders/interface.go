@@ -35,13 +35,13 @@ type Downloader interface {
 	GetMetadataFiles() []string
 }
 
-func GenerateObjects(image, secretName string) []*v1beta1.Downloader {
-	downloaderObjs := make([]*v1beta1.Downloader, 0, len(AllDownloaders))
+func GenerateObjects(image, secretName string) []*v1beta1.ClusterDownloader {
+	downloaderObjs := make([]*v1beta1.ClusterDownloader, 0, len(AllDownloaders))
 	for _, d := range AllDownloaders {
-		downlaoderObj := &v1beta1.Downloader{
+		downlaoderObj := &v1beta1.ClusterDownloader{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: v1beta1.SchemeGroupVersion.String(),
-				Kind:       "Downloader",
+				Kind:       "ClusterDownloader",
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: d.GetName(),

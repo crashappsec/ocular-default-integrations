@@ -45,6 +45,9 @@ CONTAINER_TOOL ?= docker
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+# ld flags passed to go build
+LDFLAGS ?= -X main.version=$(OCULAR_VERSION) -X main.buildTime=$(shell date -Iseconds) -X main.gitCommit=$(shell git rev-parse --short HEAD)
+
 
 .PHONY: all clean
 all: docker-build-all
@@ -184,15 +187,15 @@ docker-build-all: ## Build docker image with the manager.
 
 .PHONY: docker-build-uploaders
 docker-build-uploaders: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${OCULAR_UPLOADERS_IMG} --build-arg INTEGRATION=uploaders .
+	$(CONTAINER_TOOL) build -t ${OCULAR_UPLOADERS_IMG} --build-arg INTEGRATION=uploaders --build-arg LDFLAGS="$(LDFLAGS)" .
 
 .PHONY: docker-build-downloaders
 docker-build-downloaders: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${OCULAR_DOWNLOADERS_IMG}  --build-arg INTEGRATION=downloaders .
+	$(CONTAINER_TOOL) build -t ${OCULAR_DOWNLOADERS_IMG}  --build-arg INTEGRATION=downloaders --build-arg LDFLAGS="$(LDFLAGS)" .
 
 .PHONY: docker-build-crawlers
 docker-build-crawlers: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${OCULAR_CRAWLERS_IMG} --build-arg INTEGRATION=crawlers .
+	$(CONTAINER_TOOL) build -t ${OCULAR_CRAWLERS_IMG} --build-arg INTEGRATION=crawlers  --build-arg LDFLAGS="$(LDFLAGS)" .
 
 .PHONY: docker-push-all
 docker-push-all: ## Push docker image with the manager.
@@ -230,7 +233,7 @@ docker-buildx-img-%: ## Build and push docker image for the manager for cross-pl
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name ocular-builder
 	$(CONTAINER_TOOL) buildx use ocular-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag $(OCULAR_$(shell echo '$(@:docker-buildx-img-%=%)' | tr '[:lower:]' '[:upper:]')_IMG) --build-arg INTEGRATION=$(@:docker-buildx-img-%=%) -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx build --build-arg LDFLAGS="$(LDFLAGS)" --push --platform=$(PLATFORMS) --tag $(OCULAR_$(shell echo '$(@:docker-buildx-img-%=%)' | tr '[:lower:]' '[:upper:]')_IMG) --build-arg INTEGRATION=$(@:docker-buildx-img-%=%) -f Dockerfile.cross .
 	- $(CONTAINER_TOOL) buildx rm ocular-builder
 	rm Dockerfile.cross
 

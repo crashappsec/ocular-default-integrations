@@ -101,7 +101,10 @@ func (d Dockerhub) Crawl(ctx context.Context, params map[string]string, queue ch
 				targetVersion := tag.Name
 				l.Info("queuing target", "repository", repoName, "tag", targetVersion)
 				queue <- CrawledTarget{
-					DefaultDownloader: downloader,
+					DefaultDownloader: corev1.ObjectReference{
+						Name: downloader,
+						Kind: "ClusterDownloader",
+					},
 					Target: v1beta1.Target{
 						Version:    targetVersion,
 						Identifier: repoName,

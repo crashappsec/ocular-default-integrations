@@ -5,9 +5,9 @@ metadata:
 prefix: ghcr.io/crashappsec/ocular-default-
 suffix: :latest
 fieldSpecs:
-  - kind: Crawler
+  - kind: ClusterCrawler
     path: spec/container/image
-  - kind: Downloader
+  - kind: ClusterDownloader
     path: spec/container/image
-  - kind: Uploader
+  - kind: ClusterUploader
     path: spec/container/image

@@ -23,7 +23,7 @@ import (
 // the Downloader parameter).
 type CrawledTarget struct {
 	Target            v1beta1.Target
-	DefaultDownloader string
+	DefaultDownloader corev1.ObjectReference
 }
 
 var AllCrawlers = []Crawler{
@@ -36,14 +36,15 @@ var AllCrawlers = []Crawler{
 }
 
 const (
-	ProfileParamName              = "PROFILE"
-	SleepDurationParamName        = "SLEEP_DURATION"
-	SleepDurationDefaultValue     = "1m"
-	PipelineTTLParamName          = "PIPELINE_TTL"
-	PipelineTTLDefaultValue       = "168h" // 7 days
-	DownloaderOverrideParamName   = "DOWNLOADER_OVERRIDE"
-	ScanServiceAccountParamName   = "SCAN_SERVICE_ACCOUNT"
-	UploadServiceAccountParamName = "UPLOAD_SERVICE_ACCOUNT"
+	ProfileParamName                = "PROFILE"
+	SleepDurationParamName          = "SLEEP_DURATION"
+	SleepDurationDefaultValue       = "1m"
+	PipelineTTLParamName            = "PIPELINE_TTL"
+	PipelineTTLDefaultValue         = "168h" // 7 days
+	DownloaderOverrideParamName     = "DOWNLOADER_OVERRIDE"
+	DownloaderOverrideKindParamName = "DOWNLOADER_OVERRIDE_KIND"
+	ScanServiceAccountParamName     = "SCAN_SERVICE_ACCOUNT"
+	UploadServiceAccountParamName   = "UPLOAD_SERVICE_ACCOUNT"
 )
 
 var DefaultParameters = []v1beta1.ParameterDefinition{
@@ -70,6 +71,13 @@ var DefaultParameters = []v1beta1.ParameterDefinition{
 		Required:    false,
 	},
 	{
+		Name: DownloaderOverrideKindParamName,
+		Description: "Set the kind for the downloader override, either Downloader or ClusterDownloader" +
+			"(default is Downloader)",
+		Required: false,
+		Default:  ptr.To("Downloader"),
+	},
+	{
 		Name:        ScanServiceAccountParamName,
 		Description: "Service account to use for the pipelines created from this crawler.",
 		Required:    false,
@@ -90,8 +98,8 @@ type Crawler interface {
 	EnvironmentVariables() []corev1.EnvVar
 }
 
-func GenerateObjects(image, secretName string) []*v1beta1.Crawler {
-	crawlerObjs := make([]*v1beta1.Crawler, 0, len(AllCrawlers))
+func GenerateObjects(image, secretName string) []*v1beta1.ClusterCrawler {
+	crawlerObjs := make([]*v1beta1.ClusterCrawler, 0, len(AllCrawlers))
 	for _, c := range AllCrawlers {
 		crawlerParams := c.GetParameters()
 
@@ -108,10 +116,10 @@ func GenerateObjects(image, secretName string) []*v1beta1.Crawler {
 			}
 		}
 
-		crawlerObj := &v1beta1.Crawler{
+		crawlerObj := &v1beta1.ClusterCrawler{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: v1beta1.SchemeGroupVersion.String(),
-				Kind:       "Crawler",
+				Kind:       "ClusterCrawler",
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: c.GetName(),

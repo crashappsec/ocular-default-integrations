@@ -225,7 +225,10 @@ func crawlOrg(
 				Target: v1beta1.Target{
 					Identifier: repo.GetCloneURL(),
 				},
-				DefaultDownloader: dl,
+				DefaultDownloader: corev1.ObjectReference{
+					Name: dl,
+					Kind: "ClusterDownloader",
+				},
 			}
 		}
 		if resp.NextPage == 0 {

@@ -37,14 +37,14 @@ type Uploader interface {
 	EnvironmentVariables() []corev1.EnvVar
 }
 
-func GenerateObjects(image, secretName string) []*v1beta1.Uploader {
-	uploaderObjs := make([]*v1beta1.Uploader, 0, len(AllUploaders))
+func GenerateObjects(image, secretName string) []*v1beta1.ClusterUploader {
+	uploaderObjs := make([]*v1beta1.ClusterUploader, 0, len(AllUploaders))
 	for _, u := range AllUploaders {
 		params := u.GetParameters()
-		uploaderObj := &v1beta1.Uploader{
+		uploaderObj := &v1beta1.ClusterUploader{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: v1beta1.SchemeGroupVersion.String(),
-				Kind:       "Uploader",
+				Kind:       "ClusterUploader",
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: u.GetName(),

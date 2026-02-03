@@ -1,13 +1,22 @@
 # Ocular Default Integrations Release Notes
 <!-- https://keepachangelog.com -->
 
+# [v0.1.7](https://github.com/crashappsec/ocular/releases/tag/v0.1.7) - **February 3rd, 2025**
+
+### Fixed
+
+- Use cluster wide resources over namespaced
+  - `Crawler` changed to `ClusterCrawler`
+  - `Downloader` changed to `ClusterDownloader`
+  - `Uploader` changed to `ClusterUploader`
+
+
 # [v0.1.6](https://github.com/crashappsec/ocular/releases/tag/v0.1.6) - **December 10, 2025**
 
 ### Fixed
 
 - Git downloader now correctly handles parsing of custom git config
 - Add support for GitHub app installation tokens in GitHub crawler and git downloader
-
 
 
 # [v0.1.5](https://github.com/crashappsec/ocular/releases/tag/v0.1.5) - **December 3, 2025**
