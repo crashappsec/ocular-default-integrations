@@ -105,19 +105,19 @@ func main() {
 	}
 
 	downloaderObjs := downloaders.GenerateObjects(downloadersImage, "downloader-secrets")
-	if err = createResourceKustomizeFolder[*v1beta1.Downloader](ctx, "Downloaders", downloaderObjs); err != nil {
+	if err = createResourceKustomizeFolder[*v1beta1.ClusterDownloader](ctx, "Downloaders", downloaderObjs); err != nil {
 		logger.Error(err, "error creating downloader kustomize folder")
 		os.Exit(1)
 	}
 
 	crawlerObjs := crawlers.GenerateObjects(crawlersImage, "crawler-secrets")
-	if err = createResourceKustomizeFolder[*v1beta1.Crawler](ctx, "Crawlers", crawlerObjs); err != nil {
+	if err = createResourceKustomizeFolder[*v1beta1.ClusterCrawler](ctx, "Crawlers", crawlerObjs); err != nil {
 		logger.Error(err, "error creating crawler kustomize folder")
 		os.Exit(1)
 	}
 
 	uploaderObjs := uploaders.GenerateObjects(uploadersImage, "uploader-secrets")
-	if err = createResourceKustomizeFolder[*v1beta1.Uploader](ctx, "Uploaders", uploaderObjs); err != nil {
+	if err = createResourceKustomizeFolder[*v1beta1.ClusterUploader](ctx, "Uploaders", uploaderObjs); err != nil {
 		logger.Error(err, "error creating uploader kustomize folder")
 		os.Exit(1)
 	}

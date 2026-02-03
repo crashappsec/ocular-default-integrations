@@ -288,3 +288,6 @@ hack/ignore
 !go.work
 
 config/dev/**/*
+config/local
+config/prod
+config/staging

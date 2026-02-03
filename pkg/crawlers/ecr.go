@@ -94,7 +94,11 @@ func (e ECR) Crawl(ctx context.Context, params map[string]string, queue chan Cra
 			targetVersion := *tag.Key
 			l.Info("queuing target", "repository", repoName, "tag", targetVersion)
 			queue <- CrawledTarget{
-				DefaultDownloader: downloaders.Docker{}.GetName(),
+				DefaultDownloader: corev1.ObjectReference{
+					Name: downloaders.Docker{}.GetName(),
+					Kind: "ClusterDownloader",
+				},
+
 				Target: v1beta1.Target{
 					Version:    targetVersion,
 					Identifier: fmt.Sprintf("%s/%s", *repo.RepositoryUri, repoName),

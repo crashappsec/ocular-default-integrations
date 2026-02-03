@@ -96,6 +96,7 @@ func main() {
 
 	profile := params[crawlers.ProfileParamName]
 	downloaderOverride := params[crawlers.DownloaderOverrideParamName]
+	downloaderKind := params[crawlers.DownloaderOverrideKindParamName]
 	scannerServiceAccount := params[crawlers.ScanServiceAccountParamName]
 	uploaderServiceAccount := params[crawlers.UploadServiceAccountParamName]
 
@@ -142,9 +143,14 @@ func main() {
 	lastRun := time.Now()
 	for crawledTarget := range queue {
 		target := crawledTarget.Target
-		downloader := "ocular-defaults-" + crawledTarget.DefaultDownloader
+		downloader := crawledTarget.DefaultDownloader
+		downloader.Name = "ocular-defaults-" + downloader.Name
 		if downloaderOverride != "" {
-			downloader = downloaderOverride
+			downloader = corev1.ObjectReference{
+				Name: downloaderOverride,
+				Kind: downloaderKind,
+			}
+
 		}
 
 		targetL := logger.WithValues(
@@ -175,9 +181,7 @@ func main() {
 				ProfileRef: corev1.ObjectReference{
 					Name: profile,
 				},
-				DownloaderRef: corev1.ObjectReference{
-					Name: downloader,
-				},
+				DownloaderRef:           downloader,
 				TTLSecondsAfterFinished: ptr.To[int32](int32(ttl.Seconds())),
 				Target:                  target,
 			},

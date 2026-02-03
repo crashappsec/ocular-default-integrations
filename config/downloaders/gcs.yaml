@@ -1,5 +1,5 @@
 apiVersion: ocular.crashoverride.run/v1beta1
-kind: Downloader
+kind: ClusterDownloader
 metadata:
   name: gcs
 spec:
