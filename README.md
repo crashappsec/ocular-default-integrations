@@ -32,14 +32,10 @@ Then, install the default integrations chart:
 helm repo add crashoverride-helm-charts https://crashoverride-helm-charts.storage
 helm repo update
 
-# Should be the namespace you want to run pipelines/searches in
-NAMESPACE="ocular"
-
-helm install ocular-default-integrations crashoverride-helm-charts/ocular-default-integrations \
-    --namespace $NAMESPACE \
-    --create-namespace
-# Resource will then be available as a CRD in the cluster
-# kubectl get crawlers -n $NAMESPACE
-# kubectl get downloaders -n $NAMESPACE
-# kubectl get uploaders -n $NAMESPACE
+helm install ocular-default-integrations crashoverride-helm-charts/ocular-default-integrations
+# Resource will then be available as a CRD in the cluster. 
+# Installs as cluster wide resources
+kubectl get clustercrawlers
+kubectl get clusterdownloaders
+kubectl get clusteruploaders
 ```
