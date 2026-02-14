@@ -13,64 +13,40 @@ import (
 	"context"
 	"strings"
 
-	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular/api/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 )
 
-var _ Crawler = StaticList{}
-
-type StaticList struct{}
-
-func (StaticList) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return nil
+func init() {
+	All.registerCrawler(StaticList)
 }
 
-func (StaticList) GetFileSecrets() []definitions.FileSecret {
-	return nil
-}
-func (StaticList) EnvironmentVariables() []corev1.EnvVar {
-	return nil
+var StaticList = Crawler{
+	Name: "static-list",
+	Parameters: []v1beta1.ParameterDefinition{
+		{
+			Name:        StaticTargetIdentifierList,
+			Description: "New line separated list of target identifiers to crawl.",
+			Required:    true,
+		},
+	},
+	Crawl: crawlStaticList,
 }
 
 const (
 	StaticTargetIdentifierList = "TARGET_IDENTIFIERS"
 )
 
-func (s StaticList) Crawl(
+func crawlStaticList(
 	_ context.Context,
 	params map[string]string,
-	queue chan CrawledTarget,
+	queue chan v1beta1.Target,
 ) error {
 	scanner := bufio.NewScanner(strings.NewReader(params[StaticTargetIdentifierList]))
 	for scanner.Scan() {
-		queue <- CrawledTarget{
-			Target: v1beta1.Target{
-				Identifier: scanner.Text(),
-			},
+		queue <- v1beta1.Target{
+			Identifier: scanner.Text(),
 		}
 	}
 
 	return nil
-}
-
-func (s StaticList) GetParameters() []v1beta1.ParameterDefinition {
-	return []v1beta1.ParameterDefinition{
-		{
-			Name:        StaticTargetIdentifierList,
-			Description: "New line separated list of target identifiers to crawl.",
-			Required:    true,
-		},
-		// This is now set to required, since there is no "default" downloader
-		// for arbitrary targets.
-		{
-			Name:        DownloaderOverrideParamName,
-			Description: "Downloader to use for the crawled targets. (required for StaticList crawler)",
-			Required:    true,
-		},
-	}
-}
-
-func (s StaticList) GetName() string {
-	return "static-list"
 }

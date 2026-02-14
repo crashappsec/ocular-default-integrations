@@ -74,26 +74,19 @@ func main() {
 
 	metadata, err := input.ParseMetadataFromEnv()
 	if err != nil {
-		logger.Error(err, "failed to parse metadata from environment")
+		l.Error(err, "failed to parse metadata from environment")
 		os.Exit(1)
 	}
 
-	var uploader uploaders.Uploader
-	for _, u := range uploaders.AllUploaders {
-		if u.GetName() == uploaderName {
-			uploader = u
-			break
-		}
-	}
-
-	if uploader == nil {
-		logger.Error(fmt.Errorf("unknown uploader %s", uploaderName), "no valid uploader specified")
+	uploader, found := uploaders.All[uploaderName]
+	if !found {
+		l.Error(fmt.Errorf("unknown uploader %s", uploaderName), "no valid uploader specified")
 		os.Exit(1)
 	}
 
-	logger.WithValues("uploader", uploaderName).Info("begin upload process")
+	l.WithValues("uploader", uploaderName).Info("begin upload process")
 
-	params, err := input.ParseParamsFromEnv(uploader.GetParameters())
+	params, err := input.ParseParamsFromEnv(uploader.Parameters)
 	if err != nil {
 		logger.Error(err, "unable to parse parameters from environment")
 	}
@@ -102,9 +95,9 @@ func main() {
 	for _, file := range files {
 		l.Info("validating file exists", "file", file)
 		if _, err := os.Stat(file); os.IsNotExist(err) {
-			logger.Info("file does not exist, skipping", "file", file)
+			l.Info("file does not exist, skipping", "file", file)
 		} else if err != nil {
-			logger.Error(err, "unable to stat file, skipping", "file", file)
+			l.Error(err, "unable to stat file, skipping", "file", file)
 		} else {
 			validatedFiles = append(validatedFiles, file)
 		}

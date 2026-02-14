@@ -17,55 +17,59 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var AllDownloaders = []Downloader{
-	Git{},
-	Docker{},
-	gcs{},
-	npm{},
-	pypi{},
-	s3{},
+var All = make(all)
+
+type all map[string]Downloader
+
+func (a all) registerDownloader(d Downloader) {
+	if a == nil {
+		return
+	}
+
+	if d.Download == nil {
+		panic("download function must be defined")
+	}
+
+	a[d.Name] = d
 }
 
-type Downloader interface {
-	GetName() string
-	Download(ctx context.Context, cloneURL, version, targetDir string) error
-	GetEnvSecrets() []definitions.EnvironmentSecret
-	GetFileSecrets() []definitions.FileSecret
-	EnvironmentVariables() []corev1.EnvVar
-	GetMetadataFiles() []string
+type Downloader struct {
+	Parameters           []v1beta1.ParameterDefinition
+	Name                 string
+	Download             func(ctx context.Context, params map[string]string, identifier, version, targetDir string) error
+	EnvironmentSecrets   []definitions.EnvironmentSecret
+	FileSecrets          []definitions.FileSecret
+	EnvironmentVariables []corev1.EnvVar
+	MetadataFiles        []string
 }
 
 func GenerateObjects(image, secretName string) []*v1beta1.ClusterDownloader {
-	downloaderObjs := make([]*v1beta1.ClusterDownloader, 0, len(AllDownloaders))
-	for _, d := range AllDownloaders {
+	downloaderObjs := make([]*v1beta1.ClusterDownloader, 0, len(All))
+	for _, d := range All {
 		downlaoderObj := &v1beta1.ClusterDownloader{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: v1beta1.SchemeGroupVersion.String(),
 				Kind:       "ClusterDownloader",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: d.GetName(),
+				Name: d.Name,
 			},
 			Spec: v1beta1.DownloaderSpec{
 				Container: corev1.Container{
-					Name:  d.GetName(),
+					Name:  d.Name,
 					Image: image,
-					Env:   d.EnvironmentVariables(),
+					Env:   d.EnvironmentVariables,
 				},
-				MetadataFiles: d.GetMetadataFiles(),
+				MetadataFiles: d.MetadataFiles,
+				Parameters:    d.Parameters,
 			},
 		}
-
-		if envVars := d.EnvironmentVariables(); envVars != nil {
-			downlaoderObj.Spec.Container.Env = envVars
+		if d.EnvironmentSecrets != nil {
+			downlaoderObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars(secretName, d.EnvironmentSecrets)
 		}
 
-		if envSecrets := d.GetEnvSecrets(); envSecrets != nil {
-			downlaoderObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars(secretName, envSecrets)
-		}
-
-		if fileSecrets := d.GetFileSecrets(); fileSecrets != nil {
-			volume, mounts := definitions.FileSecretsToVolumeMounts(secretName, d.GetName(), fileSecrets)
+		if d.FileSecrets != nil {
+			volume, mounts := definitions.FileSecretsToVolumeMounts(secretName, d.Name, d.FileSecrets)
 			downlaoderObj.Spec.Volumes = append(downlaoderObj.Spec.Volumes, volume)
 			downlaoderObj.Spec.Container.VolumeMounts = append(downlaoderObj.Spec.Container.VolumeMounts, mounts...)
 		}

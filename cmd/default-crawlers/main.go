@@ -13,20 +13,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
-	"sync"
-	"time"
+	"syscall"
 
-	"github.com/crashappsec/ocular-default-integrations/pkg/cli"
 	"github.com/crashappsec/ocular-default-integrations/pkg/crawlers"
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
 	"github.com/crashappsec/ocular/api/v1beta1"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -73,136 +69,47 @@ func main() {
 		crawlerName = crawlerOverride
 	}
 
-	namespace := os.Getenv(v1beta1.EnvVarNamespaceName)
-
-	var crawler crawlers.Crawler
-	for _, c := range crawlers.AllCrawlers {
-		if c.GetName() == crawlerName {
-			crawler = c
-			break
-		}
-	}
-	if crawler == nil {
+	crawler, found := crawlers.All[crawlerName]
+	if !found {
 		logger.Error(fmt.Errorf("unknown crawler %s", crawlerName), "no valid crawler specified")
 		os.Exit(1)
 	}
 
-	paramDefinitions := input.CombineParameterDefinitions(crawler.GetParameters(), crawlers.DefaultParameters)
-
-	params, err := input.ParseParamsFromEnv(paramDefinitions)
+	params, err := input.ParseParamsFromEnv(crawler.Parameters)
 	if err != nil {
 		logger.Error(err, "unable to parse parameters from environment")
-	}
-
-	profile := params[crawlers.ProfileParamName]
-	downloaderOverride := params[crawlers.DownloaderOverrideParamName]
-	downloaderKind := params[crawlers.DownloaderOverrideKindParamName]
-	scannerServiceAccount := params[crawlers.ScanServiceAccountParamName]
-	uploaderServiceAccount := params[crawlers.UploadServiceAccountParamName]
-
-	sleepDuration, err := time.ParseDuration(params[crawlers.SleepDurationParamName])
-	if err != nil {
-		sleepDuration = time.Minute
-		logger.Error(
-			err,
-			fmt.Sprintf("unable to parse sleep duration, defaulting to %s", sleepDuration.String()),
-		)
-	}
-
-	ttl, err := time.ParseDuration(params[crawlers.PipelineTTLParamName])
-	if err != nil {
-		ttl = 24 * time.Hour * 7 // 7 days
-		logger.Error(
-			err,
-			fmt.Sprintf("unable to parse pipeline TTL, defaulting to %s", ttl.String()),
-		)
-	}
-
-	clientset, err := cli.ParseKubernetesClientset(ctx)
-	if err != nil {
-		logger.Error(err, "unable to create kubernetes clientset")
 		os.Exit(1)
 	}
 
-	var (
-		queue = make(chan crawlers.CrawledTarget)
-		wg    sync.WaitGroup
-	)
+	fifo, err := os.OpenFile(os.Getenv(v1beta1.EnvVarPipelineFIFO), syscall.O_WRONLY, os.ModeNamedPipe)
+	if err != nil {
+		logger.Error(err, "unable to open pipeline FIFO")
+		os.Exit(1)
+	}
+	logger = logger.WithValues("crawler", crawler.Name, "params", params)
+	logger.Info("executing crawler")
 
-	wg.Add(1)
+	var queue = make(chan v1beta1.Target)
 
 	go func() {
-		logger.Info("starting crawler", "crawler", crawlerName, "params", params)
-		defer wg.Done()
 		defer close(queue)
 		if err := crawler.Crawl(ctx, params, queue); err != nil {
-			logger.Error(err, "error running crawler", "crawler", crawlerName, "params", params)
+			logger.Error(err, "error running crawler")
 		}
 	}()
 
-	lastRun := time.Now()
-	for crawledTarget := range queue {
-		target := crawledTarget.Target
-		downloader := crawledTarget.DefaultDownloader
-		downloader.Name = "ocular-defaults-" + downloader.Name
-		if downloaderOverride != "" {
-			downloader = corev1.ObjectReference{
-				Name: downloaderOverride,
-				Kind: downloaderKind,
-			}
-
+	logger.Info("awaiting target discovery")
+	encoder := json.NewEncoder(fifo)
+	for {
+		target, ok := <-queue
+		if !ok {
+			logger.Info("queue closed, exiting")
+			break
 		}
-
-		targetL := logger.WithValues(
-			"target_identifier", target.Identifier,
-			"target_version", target.Version,
-			"downloader", downloader,
-			"profile", profile,
-		)
-
-		waitRemaining := sleepDuration - time.Since(lastRun)
-		if waitRemaining < 0 {
-			waitRemaining = 0
-		}
-		targetL.Info("sleeping before processing target", "remaining", waitRemaining)
-		time.Sleep(waitRemaining)
-
-		targetL.Info("processing target")
-
-		pipeline := &v1beta1.Pipeline{
-			ObjectMeta: v1.ObjectMeta{
-				GenerateName: fmt.Sprintf("%s-", searchName),
-				Labels: map[string]string{
-					"ocular.crashoverride.run/search":  searchName,
-					"ocular.crashoverride.run/crawler": crawlerName,
-				},
-			},
-			Spec: v1beta1.PipelineSpec{
-				ProfileRef: corev1.ObjectReference{
-					Name: profile,
-				},
-				DownloaderRef:           downloader,
-				TTLSecondsAfterFinished: ptr.To[int32](int32(ttl.Seconds())),
-				Target:                  target,
-			},
-		}
-
-		if scannerServiceAccount != "" {
-			pipeline.Spec.ScanServiceAccountName = scannerServiceAccount
-		}
-		if uploaderServiceAccount != "" {
-			pipeline.Spec.UploadServiceAccountName = uploaderServiceAccount
-		}
-
-		p, err := clientset.ApiV1beta1().
-			Pipelines(namespace).
-			Create(ctx, pipeline, v1.CreateOptions{})
+		err := encoder.Encode(&target)
 		if err != nil {
-			targetL.Error(err, "error processing target")
-		} else {
-			targetL.Info("pipeline created", "pipeline_name", p.Name)
+			logger.Error(err, "unable to encode target JSON", "target", target)
 		}
-		lastRun = time.Now()
 	}
 
 	logger.Info("search finished successfully")

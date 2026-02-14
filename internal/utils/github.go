@@ -10,7 +10,6 @@ package utils
 
 import (
 	"context"
-	"log"
 	"net/http"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -23,7 +22,7 @@ func AuthenticateGitHubAppInstallation(_ context.Context, appID, installationID 
 	// Wrap the shared transport for use with the app ID 1 authenticating with installation ID 99.
 	itr, err := ghinstallation.New(tr, appID, installationID, privatePEM)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	return itr, nil
 }

@@ -11,6 +11,18 @@ spec:
           key: github-token
           name: crawler-secrets
           optional: true
+    - name: GITHUB_APP_PRIVATE_KEY
+      valueFrom:
+        secretKeyRef:
+          key: github-app-private-key
+          name: crawler-secrets
+          optional: true
+    - name: GITHUB_APP_ID
+      valueFrom:
+        secretKeyRef:
+          key: github-app-id
+          name: crawler-secrets
+          optional: true
     image: crawlers
     name: ghcr
     resources: {}
@@ -23,32 +35,4 @@ spec:
       the latest N tags for each GHCR image and start a new pipeline for each. Set
       to 0 to retrieve all versions. Defaults to 1.
     name: RECENT_TAG_LIMIT
-    required: false
-  - description: Profile to use for the pipelines created from this crawler.
-    name: PROFILE
-    required: true
-  - default: 1m
-    description: Duration to sleep between requests. Will be parsed as a time.Duration.
-    name: SLEEP_DURATION
-    required: false
-  - default: 168h
-    description: TTL for the pipelines created by this crawler. Will be parsed as
-      a time.Duration.
-    name: PIPELINE_TTL
-    required: false
-  - description: Override the downloader for the crawler. By default, it will be chosen
-      based on the crawler type.
-    name: DOWNLOADER_OVERRIDE
-    required: false
-  - default: Downloader
-    description: Set the kind for the downloader override, either Downloader or ClusterDownloader(default
-      is Downloader)
-    name: DOWNLOADER_OVERRIDE_KIND
-    required: false
-  - description: Service account to use for the pipelines created from this crawler.
-    name: SCAN_SERVICE_ACCOUNT
-    required: false
-  - description: Service account to use for the uploaders in the pipelines created
-      from this crawler.
-    name: UPLOAD_SERVICE_ACCOUNT
     required: false

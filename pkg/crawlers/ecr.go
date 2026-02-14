@@ -14,39 +14,32 @@ import (
 	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
-	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/pkg/clients/aws"
-	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type ECR struct{}
-
-func (e ECR) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return nil
+func init() {
+	All.registerCrawler(ECR)
 }
 
-func (e ECR) GetParameters() []v1beta1.ParameterDefinition {
-	return append(aws.GetParameters(),
-		v1beta1.ParameterDefinition{
-			Name: RecentTagLimitParam,
-			Description: "Maximum number of tags (versions) to retrieve per image. " +
-				"Will retrieve the latest N tags for each ECR image and start a new pipeline for each. " +
-				"Set to 0 to retrieve all versions. Defaults to 1.",
-			Required: false,
-			Default:  ptr.To("1"),
-		})
+var ECR = Crawler{
+	Name:        "ecr",
+	FileSecrets: aws.FileSecrets,
+	Parameters: append(aws.Parameters, v1beta1.ParameterDefinition{
+		Name: RecentTagLimitParam,
+		Description: "Maximum number of tags (versions) to retrieve per image. " +
+			"Will retrieve the latest N tags for each ECR image and start a new pipeline for each. " +
+			"Set to 0 to retrieve all versions. Defaults to 1.",
+		Required: false,
+		Default:  ptr.To("1"),
+	}),
+	Crawl: crawlECR,
 }
 
-func (e ECR) GetName() string {
-	return "ecr"
-}
-
-func (e ECR) Crawl(ctx context.Context, params map[string]string, queue chan CrawledTarget) error {
+func crawlECR(ctx context.Context, params map[string]string, queue chan v1beta1.Target) error {
 	l := log.FromContext(ctx).WithValues("crawler", "ghcr")
 	regionOverride := params[aws.RegionParamName]
 	profileOverride := params[aws.ProfileParamName]
@@ -93,29 +86,12 @@ func (e ECR) Crawl(ctx context.Context, params map[string]string, queue chan Cra
 		for _, tag := range tags {
 			targetVersion := *tag.Key
 			l.Info("queuing target", "repository", repoName, "tag", targetVersion)
-			queue <- CrawledTarget{
-				DefaultDownloader: corev1.ObjectReference{
-					Name: downloaders.Docker{}.GetName(),
-					Kind: "ClusterDownloader",
-				},
-
-				Target: v1beta1.Target{
-					Version:    targetVersion,
-					Identifier: fmt.Sprintf("%s/%s", *repo.RepositoryUri, repoName),
-				},
+			queue <- v1beta1.Target{
+				Version:    targetVersion,
+				Identifier: fmt.Sprintf("%s/%s", *repo.RepositoryUri, repoName),
 			}
 		}
 
 	}
 	return merr.ErrorOrNil()
 }
-
-func (e ECR) GetFileSecrets() []definitions.FileSecret {
-	return aws.GetAWSFileSecrets()
-}
-
-func (e ECR) EnvironmentVariables() []corev1.EnvVar {
-	return nil
-}
-
-var _ Crawler = ECR{}

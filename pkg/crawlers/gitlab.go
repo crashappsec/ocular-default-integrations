@@ -17,47 +17,25 @@ import (
 	"time"
 
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
-	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type GitLab struct{}
-
-func (g GitLab) GetName() string {
-	return "gitlab"
+func init() {
+	All.registerCrawler(GitLab)
 }
 
-var _ Crawler = GitLab{}
-
-func (GitLab) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return []definitions.EnvironmentSecret{
+var GitLab = Crawler{
+	Name: "gitlab",
+	EnvironmentSecrets: []definitions.EnvironmentSecret{
 		{
 			SecretKey:  "gitlab-token",
 			EnvVarName: GitlabTokenSecretEnvVar,
 		},
-	}
-}
-
-func (GitLab) GetFileSecrets() []definitions.FileSecret {
-	return nil
-}
-
-func (GitLab) EnvironmentVariables() []corev1.EnvVar {
-	return nil
-}
-
-const (
-	GitLabGroupsParamName          = "GITLAB_GROUPS"
-	GitlabInstanceURLParamName     = "GITLAB_INSTANCE_URL"
-	GitlabIncludeSubgroupParamName = "INCLUDE_SUBGROUPS"
-)
-
-func (g GitLab) GetParameters() []v1beta1.ParameterDefinition {
-	return []v1beta1.ParameterDefinition{
+	},
+	Parameters: []v1beta1.ParameterDefinition{
 		{
 			Name:        GitLabGroupsParamName,
 			Description: "Comma-separated list of GitLab groups to crawl. If empty, the entire instance will be crawled.",
@@ -73,8 +51,15 @@ func (g GitLab) GetParameters() []v1beta1.ParameterDefinition {
 			Description: "If set, include projects from subgroups of the specified groups.",
 			Required:    false,
 		},
-	}
+	},
+	Crawl: crawlGitLab,
 }
+
+const (
+	GitLabGroupsParamName          = "GITLAB_GROUPS"
+	GitlabInstanceURLParamName     = "GITLAB_INSTANCE_URL"
+	GitlabIncludeSubgroupParamName = "INCLUDE_SUBGROUPS"
+)
 
 const (
 	GitlabTokenSecretEnvVar = "GITLAB_TOKEN"
@@ -84,10 +69,10 @@ const (
 // and sends their clone URLs to the provided queue channel. By default, the downloader
 // used is "git", but this can be overridden by setting the parameter variable
 // [DownloaderParamName] to a different value.
-func (g GitLab) Crawl(
+func crawlGitLab(
 	ctx context.Context,
 	params map[string]string,
-	queue chan CrawledTarget,
+	queue chan v1beta1.Target,
 ) error {
 	l := log.FromContext(ctx)
 	splitGroups := strings.Split(params[GitLabGroupsParamName], ",")
@@ -107,11 +92,7 @@ func (g GitLab) Crawl(
 	// Check if the recursive parameter is set
 	includeSubGroup := params[GitlabIncludeSubgroupParamName] != ""
 
-	// will default to use default git downloader.
-	// This will be overridden in the main function if 'DOWNLOADER_OVERRIDE' param is set
-	downloader := downloaders.Git{}.GetName()
-
-	l = l.WithValues("url", baseURL, "downloader", downloader, "groups", groups)
+	l = l.WithValues("url", baseURL, "groups", groups)
 
 	client, err := gitlab.NewClient(token, gitlab.WithBaseURL(baseURL))
 	if err != nil {
@@ -119,7 +100,7 @@ func (g GitLab) Crawl(
 	}
 	if len(groups) == 0 {
 		// if there are no groups specified, crawl the entire instance
-		return crawlGitlabInstance(ctx, client, downloader, queue)
+		return crawlGitlabInstance(ctx, client, queue)
 	}
 
 	var merr *multierror.Error
@@ -127,7 +108,7 @@ func (g GitLab) Crawl(
 	for _, group := range groups {
 		groupL := l.WithValues("group", group)
 		groupL.Info(fmt.Sprintf("crawling gitlab group %s", group))
-		if err := crawlGitlabGroup(ctx, client, group, downloader, includeSubGroup, queue); err != nil {
+		if err := crawlGitlabGroup(ctx, client, group, includeSubGroup, queue); err != nil {
 			groupL.Error(err, "Error crawling gitlab group")
 			merr = multierror.Append(merr, err)
 		}
@@ -140,8 +121,8 @@ func (g GitLab) Crawl(
 func crawlGitlabGroup(
 	ctx context.Context,
 	c *gitlab.Client,
-	org, dl string, includeSubGroups bool,
-	queue chan CrawledTarget,
+	org string, includeSubGroups bool,
+	queue chan v1beta1.Target,
 ) error {
 	l := log.FromContext(ctx)
 	opt := gitlab.ListOptions{PerPage: 100}
@@ -165,14 +146,8 @@ func crawlGitlabGroup(
 
 		for _, repo := range projs {
 			l.Info("enqueuing gitlab repo", "repo", repo.HTTPURLToRepo)
-			queue <- CrawledTarget{
-				Target: v1beta1.Target{
-					Identifier: repo.HTTPURLToRepo,
-				},
-				DefaultDownloader: corev1.ObjectReference{
-					Name: dl,
-					Kind: "ClusterDownloader",
-				},
+			queue <- v1beta1.Target{
+				Identifier: repo.HTTPURLToRepo,
 			}
 		}
 		if resp.NextPage == 0 || resp.NextPage >= resp.TotalPages {
@@ -202,8 +177,7 @@ func crawlGitlabGroup(
 func crawlGitlabInstance(
 	ctx context.Context,
 	c *gitlab.Client,
-	dl string,
-	queue chan CrawledTarget,
+	queue chan v1beta1.Target,
 ) error {
 	l := log.FromContext(ctx)
 	opt := gitlab.ListOptions{PerPage: 100}
@@ -224,7 +198,7 @@ func crawlGitlabInstance(
 		}
 
 		for _, group := range groups {
-			err = crawlGitlabGroup(ctx, c, group.FullPath, dl, true, queue)
+			err = crawlGitlabGroup(ctx, c, group.FullPath, true, queue)
 			if err != nil {
 				l.Error(err, "Error crawling gitlab group", "group", group.FullPath)
 				continue

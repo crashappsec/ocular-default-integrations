@@ -18,42 +18,19 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type NpmMetadata struct {
-	Versions map[string]struct {
-		Dist struct {
-			Tarball string `json:"tarball"`
-		} `json:"dist"`
-	} `json:"versions"`
-	DistTags struct {
-		Latest string `json:"latest"`
-	} `json:"dist-tags"`
+func init() {
+	All.registerDownloader(NPM)
 }
 
-type npm struct{}
-
-var _ Downloader = npm{}
-
-func (npm) GetName() string {
-	return "npm"
-}
-func (npm) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return nil
+var NPM = Downloader{
+	Name:     "npm",
+	Download: downloadNPM,
 }
 
-func (npm) GetFileSecrets() []definitions.FileSecret {
-	return nil
-}
-
-func (npm) EnvironmentVariables() []corev1.EnvVar {
-	return nil
-}
-
-func (npm) Download(ctx context.Context, packageName, version, targetDir string) error {
+func downloadNPM(ctx context.Context, _ map[string]string, packageName, version, targetDir string) error {
 	l := log.FromContext(ctx)
 	registryURL := fmt.Sprintf("https://registry.npmjs.org/%s", packageName)
 
@@ -71,7 +48,7 @@ func (npm) Download(ctx context.Context, packageName, version, targetDir string)
 		return fmt.Errorf("failed to fetch metadata: %s", resp.Status)
 	}
 
-	var metadata NpmMetadata
+	var metadata npmMetadata
 	if err = json.NewDecoder(resp.Body).Decode(&metadata); err != nil {
 		return fmt.Errorf("failed to decode JSON: %w", err)
 	}
@@ -107,6 +84,13 @@ func (npm) Download(ctx context.Context, packageName, version, targetDir string)
 	return nil
 }
 
-func (npm) GetMetadataFiles() []string {
-	return nil
+type npmMetadata struct {
+	Versions map[string]struct {
+		Dist struct {
+			Tarball string `json:"tarball"`
+		} `json:"dist"`
+	} `json:"versions"`
+	DistTags struct {
+		Latest string `json:"latest"`
+	} `json:"dist-tags"`
 }

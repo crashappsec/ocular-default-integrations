@@ -27,43 +27,33 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-var shaRegex = regexp.MustCompile(`^sha256:[a-f0-9]{40}$`)
-
-type Docker struct{}
-
-var _ Downloader = Docker{}
-
-func (Docker) GetName() string {
-	return "docker"
+func init() {
+	All.registerDownloader(Docker)
 }
 
-const (
-	DockerConfigFolder = "/ocular/docker"
-)
-
-func (Docker) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return nil
-}
-
-func (Docker) GetFileSecrets() []definitions.FileSecret {
-	return []definitions.FileSecret{
-		{
-			SecretKey: "dockerconfig",
-			MountPath: DockerConfigFolder + "/config.json",
-		},
-	}
-}
-
-func (Docker) EnvironmentVariables() []corev1.EnvVar {
-	return []corev1.EnvVar{
+var Docker = Downloader{
+	Name: "docker",
+	EnvironmentVariables: []corev1.EnvVar{
 		{
 			Name:  "DOCKER_CONFIG",
 			Value: DockerConfigFolder,
 		},
-	}
+	},
+	FileSecrets: []definitions.FileSecret{
+		{
+			SecretKey: "dockerconfig",
+			MountPath: DockerConfigFolder + "/config.json",
+		},
+	},
+	MetadataFiles: []string{DockerMetadataPath, DockerChalkMetadataPath},
+	Download:      downloadDocker,
 }
 
-func (Docker) Download(ctx context.Context, dockerImage, tag, targetDir string) error {
+const DockerConfigFolder = "/ocular/docker"
+
+var shaRegex = regexp.MustCompile(`^sha256:[a-f0-9]{40}$`)
+
+func downloadDocker(ctx context.Context, _ map[string]string, dockerImage, tag, targetDir string) error {
 	if tag == "" {
 		tag = "latest"
 	}
@@ -212,7 +202,3 @@ const (
 	DockerMetadataPath      = v1beta1.PipelineMetadataDirectory + "/docker.json"
 	DockerChalkMetadataPath = v1beta1.PipelineMetadataDirectory + "/" + chalkFileName
 )
-
-func (Docker) GetMetadataFiles() []string {
-	return []string{DockerMetadataPath, DockerChalkMetadataPath}
-}

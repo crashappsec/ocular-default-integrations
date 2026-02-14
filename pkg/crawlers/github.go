@@ -17,63 +17,38 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/internal/utils"
-	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/google/go-github/v71/github"
 	"github.com/hashicorp/go-multierror"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type GitHubOrg struct{}
-
-var _ Crawler = GitHubOrg{}
-
-func (GitHubOrg) GetName() string {
-	return "github"
+func init() {
+	All.registerCrawler(GitHub)
 }
 
-const (
-	GitHubTokenSecretEnvVar = "GITHUB_TOKEN"
-	GitHubAppID             = "GITHUB_APP_ID"
-	GitHubAppPrivateKey     = "GITHUB_APP_PRIVATE_KEY"
-)
-
-func (o GitHubOrg) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return []definitions.EnvironmentSecret{
-		{
-			SecretKey:  "github-token",
-			EnvVarName: GitHubTokenSecretEnvVar,
-		},
-		{
-			SecretKey:  "github-app-private-key",
-			EnvVarName: GitHubAppPrivateKey,
-		},
-		{
-			SecretKey:  "github-app-id",
-			EnvVarName: GitHubAppID,
-		},
-	}
+var githubAuthenticationEnvironmentSecrets = []definitions.EnvironmentSecret{
+	{
+		SecretKey:  "github-token",
+		EnvVarName: GitHubTokenSecretEnvVar,
+	},
+	{
+		SecretKey:  "github-app-private-key",
+		EnvVarName: GitHubAppPrivateKey,
+	},
+	{
+		SecretKey:  "github-app-id",
+		EnvVarName: GitHubAppID,
+	},
 }
 
-func (o GitHubOrg) GetFileSecrets() []definitions.FileSecret {
-	return nil
-}
-func (o GitHubOrg) EnvironmentVariables() []corev1.EnvVar {
-	return nil
-}
-
-const (
-	GitHubOrgsParamName      = "GITHUB_ORGS"
-	GitHubSkipForksParamName = "SKIP_FORKS"
-)
-
-func (GitHubOrg) GetParameters() []v1beta1.ParameterDefinition {
-	return []v1beta1.ParameterDefinition{
+var GitHub = Crawler{
+	Name:               "github",
+	EnvironmentSecrets: githubAuthenticationEnvironmentSecrets,
+	Parameters: []v1beta1.ParameterDefinition{
 		{
 			Name:        GitHubOrgsParamName,
 			Description: "Comma-separated list of GitLab groups to crawl.",
@@ -85,49 +60,56 @@ func (GitHubOrg) GetParameters() []v1beta1.ParameterDefinition {
 			Required:    false,
 			Default:     ptr.To("false"),
 		},
-	}
+	},
+	Crawl: crawlGitHub,
 }
 
-// Crawl retrieves all repositories from a specified GitHub organization
+const (
+	GitHubTokenSecretEnvVar = "GITHUB_TOKEN"
+	GitHubAppID             = "GITHUB_APP_ID"
+	GitHubAppPrivateKey     = "GITHUB_APP_PRIVATE_KEY"
+)
+
+const (
+	GitHubOrgsParamName      = "GITHUB_ORGS"
+	GitHubSkipForksParamName = "SKIP_FORKS"
+)
+
+// crawlGitHub retrieves all repositories from a specified GitHub organization
 // and sends their clone URLs to the provided queue channel. By default, the downloader
 // used is "git", but this can be overridden by setting the parameter variable
 // [DownloaderParamName] to a different value. The GitHub token can be
 // set by setting the secret [GithubTokenParam].
-func (GitHubOrg) Crawl(
+func crawlGitHub(
 	baseCtx context.Context,
 	params map[string]string,
-	queue chan CrawledTarget,
+	queue chan v1beta1.Target,
 ) error {
 	l := log.FromContext(baseCtx).WithValues("crawler", "github")
 	ctx := log.IntoContext(baseCtx, l)
+
 	// retrieve params
 	orgs := strings.Split(params[GitHubOrgsParamName], ",")
 	skipForksParam := strings.ToLower(params[GitHubSkipForksParamName])
 	skipForks := skipForksParam != "" && skipForksParam != "0" && skipForksParam != "false"
-	downloader := downloaders.Git{}.GetName()
 
 	l.Info("starting github org crawler", "orgs", orgs, "skipForks", skipForks)
 	if len(orgs) == 0 {
 		return fmt.Errorf("no github org specified")
 	}
 
-	// globalClient is only used to determine if the org is a user or organization
-	globalClient := github.NewClient(nil)
-	if token := os.Getenv(GitHubTokenSecretEnvVar); token != "" {
-		globalClient = globalClient.WithAuthToken(token)
-	}
-
 	var merr *multierror.Error
 	for _, org := range orgs {
 		l.Info("crawling github org", "org", org)
-		isUser, err := isGitHubUser(ctx, globalClient, org)
+		client := createGitHubClientForOrg(ctx, org)
+		isUser, err := isGitHubUser(ctx, client, org)
 		if err != nil {
 			l.Error(err, "Error determining if org is an organization or user", "org", org)
 			merr = multierror.Append(merr, err)
 			continue
 		}
-		client := createGitHubClientForOrg(ctx, org, isUser)
-		if err := crawlOrg(ctx, client, org, downloader, isUser, skipForks, queue); err != nil {
+
+		if err := crawlOrg(ctx, client, org, isUser, skipForks, queue); err != nil {
 			l.Error(err, "Error crawling org", "org", org)
 			merr = multierror.Append(merr, err)
 		}
@@ -141,7 +123,7 @@ func (GitHubOrg) Crawl(
 // If that fails or is not configured, it falls back to using a personal access token.
 // If neither method is available, it creates an unauthenticated client.
 // The isUser parameter indicates whether the target is a user or an organization.
-func createGitHubClientForOrg(ctx context.Context, org string, isUser bool) *github.Client {
+func createGitHubClientForOrg(ctx context.Context, org string) *github.Client {
 	l := log.FromContext(ctx)
 
 	privateKey := os.Getenv(GitHubAppPrivateKey)
@@ -150,15 +132,10 @@ func createGitHubClientForOrg(ctx context.Context, org string, isUser bool) *git
 
 	if privateKey != "" && appIDErr == nil {
 		l.Info("authenticating using GitHub App")
-		// both parsed successfully, if not fall through to token auth
-		var (
-			itr *ghinstallation.Transport
-			err error
-		)
-		if isUser {
+		itr, err := utils.AuthenticateGitHubAppForOrg(ctx, org, appID, []byte(privateKey))
+		if err != nil {
+			l.Error(err, "unable to authenticate for organization, attempting as user")
 			itr, err = utils.AuthenticateGitHubAppForUser(ctx, org, appID, []byte(privateKey))
-		} else {
-			itr, err = utils.AuthenticateGitHubAppForOrg(ctx, org, appID, []byte(privateKey))
 		}
 		if err != nil {
 			l.Error(err, "failed to authenticate GitHub App, falling back to token auth if available")
@@ -179,10 +156,10 @@ func createGitHubClientForOrg(ctx context.Context, org string, isUser bool) *git
 func crawlOrg(
 	ctx context.Context,
 	c *github.Client,
-	org, dl string,
+	org string,
 	isUser bool,
 	skipForks bool,
-	queue chan CrawledTarget,
+	queue chan v1beta1.Target,
 ) error {
 	l := log.FromContext(ctx)
 
@@ -221,14 +198,8 @@ func crawlOrg(
 				continue
 			}
 			l.Info("enqueuing repository", "repo", repo.GetFullName(), "url", repo.GetCloneURL())
-			queue <- CrawledTarget{
-				Target: v1beta1.Target{
-					Identifier: repo.GetCloneURL(),
-				},
-				DefaultDownloader: corev1.ObjectReference{
-					Name: dl,
-					Kind: "ClusterDownloader",
-				},
+			queue <- v1beta1.Target{
+				Identifier: repo.GetCloneURL(),
 			}
 		}
 		if resp.NextPage == 0 {

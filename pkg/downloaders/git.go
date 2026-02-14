@@ -28,30 +28,24 @@ import (
 	format "github.com/go-git/go-git/v6/plumbing/format/config"
 	"github.com/go-git/go-git/v6/plumbing/transport"
 	"github.com/go-git/go-git/v6/plumbing/transport/http"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type Git struct{}
-
-type GitMetadata struct {
-	Ref      string `json:"ref,omitempty"`
-	Hash     string `json:"hash,omitempty"`
-	CloneURL string `json:"clone_url,omitempty"`
-	Public   bool   `json:"public,omitempty"`
+func init() {
+	All.registerDownloader(Git)
 }
 
-const CustomScope = "/etc/ocular/gitconfig"
-
-var _ Downloader = Git{}
-
-func (Git) GetName() string {
-	return "git"
-}
-
-func (Git) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return []definitions.EnvironmentSecret{
+var Git = Downloader{
+	Name: "git",
+	Parameters: []v1beta1.ParameterDefinition{
+		{
+			Name:        CreateDanglingRefsParamName,
+			Description: "Create referecnes to dangling commits (omit to disable)",
+			Required:    false,
+		},
+	},
+	EnvironmentSecrets: []definitions.EnvironmentSecret{
 		{
 			SecretKey:  "github-app-private-key",
 			EnvVarName: GitHubAppPrivateKeyEnvVar,
@@ -60,23 +54,34 @@ func (Git) GetEnvSecrets() []definitions.EnvironmentSecret {
 			SecretKey:  "github-app-id",
 			EnvVarName: GitHubAppId,
 		},
-	}
-}
-
-func (Git) GetFileSecrets() []definitions.FileSecret {
-	return []definitions.FileSecret{
+		{
+			SecretKey:  "github-token",
+			EnvVarName: GitHubToken,
+		},
+	},
+	FileSecrets: []definitions.FileSecret{
 		{
 			SecretKey: "gitconfig",
 			MountPath: CustomScope,
 		},
-	}
+	},
+	MetadataFiles: []string{GitMetadataPath},
+	Download:      downloadGit,
 }
 
-func (Git) EnvironmentVariables() []corev1.EnvVar {
-	return nil
+type GitMetadata struct {
+	Ref      string `json:"ref,omitempty"`
+	Hash     string `json:"hash,omitempty"`
+	CloneURL string `json:"clone_url,omitempty"`
+	Public   bool   `json:"public,omitempty"`
 }
 
-func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) error {
+const (
+	CreateDanglingRefsParamName = "CREATE_DANGLING_REFERENCES"
+	CustomScope                 = "/etc/ocular/gitconfig"
+)
+
+func downloadGit(ctx context.Context, params map[string]string, cloneURL, version, targetDir string) error {
 	l := log.FromContext(ctx).WithValues("cloneURL", cloneURL, "targetDir", targetDir)
 
 	// Initialize empty local repo
@@ -146,6 +151,12 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 
 	l.Info("cloned Git repository")
 
+	findDanlingRefs := params[CreateDanglingRefsParamName] != ""
+	if findDanlingRefs {
+		// TODO: find dangling references
+		l.Info("dangling refs feature not full supported yet")
+	}
+
 	metadata := GitMetadata{
 		CloneURL: cloneURL,
 	}
@@ -186,6 +197,7 @@ func (Git) Download(ctx context.Context, cloneURL, version, targetDir string) er
 const (
 	GitHubAppPrivateKeyEnvVar = "GITHUB_APP_PRIVATE_KEY"
 	GitHubAppId               = "GITHUB_APP_ID"
+	GitHubToken               = "GITHUB_TOKEN"
 )
 
 func handleAuthentication(ctx context.Context, rawCloneURL string) (transport.AuthMethod, error) {
@@ -198,32 +210,42 @@ func handleAuthentication(ctx context.Context, rawCloneURL string) (transport.Au
 	}
 
 	isGitHub := cloneURL.Host == "github.com"
-	githubPrivateKey := os.Getenv(GitHubAppPrivateKeyEnvVar)
+	if isGitHub {
 
-	githubAppID, appIDErr := strconv.ParseInt(os.Getenv(GitHubAppId), 10, 64)
-	if isGitHub && githubPrivateKey != "" && appIDErr == nil {
-		l.Info("configuring GitHub App authentication for git client")
-		path := strings.Split(strings.Trim(cloneURL.Path, "/"), "/")
-		if len(path) != 2 {
-			l.Error(err, "failed to extract owner/repo from clone URL for GitHub App authentication")
-			return nil, fmt.Errorf("invalid GitHub repository URL: %s", rawCloneURL)
+		githubToken := os.Getenv(GitHubToken)
+		githubPrivateKey := os.Getenv(GitHubAppPrivateKeyEnvVar)
+		githubAppID, appIDErr := strconv.ParseInt(os.Getenv(GitHubAppId), 10, 64)
+		if githubPrivateKey != "" && appIDErr == nil {
+			l.Info("configuring GitHub App authentication for git client")
+			path := strings.Split(strings.Trim(cloneURL.Path, "/"), "/")
+			if len(path) != 2 {
+				l.Error(err, "failed to extract owner/repo from clone URL for GitHub App authentication")
+				return nil, fmt.Errorf("invalid GitHub repository URL: %s", rawCloneURL)
+			}
+			owner := strings.TrimPrefix(path[0], "/")
+			repo := strings.TrimSuffix(path[1], ".git")
+			itr, err := utils.AuthenticateGitHubAppForRepository(ctx, owner, repo, githubAppID, []byte(githubPrivateKey))
+			if err != nil {
+				l.Error(err, "failed to authenticate GitHub App")
+				return nil, err
+			}
+			token, err := itr.Token(ctx)
+			if err != nil {
+				l.Error(err, "failed to get GitHub App token")
+				return nil, err
+			}
+			return &http.BasicAuth{
+				Username: "x-access-token",
+				Password: token,
+			}, nil
 		}
-		owner := strings.TrimPrefix(path[0], "/")
-		repo := strings.TrimSuffix(path[1], ".git")
-		itr, err := utils.AuthenticateGitHubAppForRepository(ctx, owner, repo, githubAppID, []byte(githubPrivateKey))
-		if err != nil {
-			l.Error(err, "failed to authenticate GitHub App")
-			return nil, err
+
+		if githubToken != "" {
+			return &http.BasicAuth{
+				Username: "x-access-token",
+				Password: githubToken,
+			}, nil
 		}
-		token, err := itr.Token(ctx)
-		if err != nil {
-			l.Error(err, "failed to get GitHub App token")
-			return nil, err
-		}
-		return &http.BasicAuth{
-			Username: "x-access-token",
-			Password: token,
-		}, nil
 	}
 
 	return nil, nil
@@ -286,9 +308,3 @@ func getGitCheckoutOption(ctx context.Context, repo *gogit.Repository, version s
 }
 
 const GitMetadataPath = v1beta1.PipelineMetadataDirectory + "/git.json"
-
-func (g Git) GetMetadataFiles() []string {
-	return []string{
-		GitMetadataPath,
-	}
-}

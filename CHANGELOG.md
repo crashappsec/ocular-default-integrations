@@ -1,6 +1,13 @@
 # Ocular Default Integrations Release Notes
 <!-- https://keepachangelog.com -->
 
+
+# [v0.1.8](https://github.com/crashappsec/ocular/releases/tag/v0.1.8) - **February 17th, 2025**
+
+### Fixed
+
+- Use new search scheduler for crawlers over manual kubernetes API interaction
+
 # [v0.1.7](https://github.com/crashappsec/ocular/releases/tag/v0.1.7) - **February 3rd, 2025**
 
 ### Fixed

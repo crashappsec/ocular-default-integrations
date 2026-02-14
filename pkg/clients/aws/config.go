@@ -27,28 +27,24 @@ const (
 	ConfigFileMountPath = "/ocular/aws/config"
 )
 
-func GetParameters() []v1beta1.ParameterDefinition {
-	return []v1beta1.ParameterDefinition{
-		{
-			Name:        RegionParamName,
-			Description: "AWS region of the ECR repository. Defaults to the region configured in the AWS SDK.",
-			Required:    false,
-		},
-		{
-			Name:        ProfileParamName,
-			Description: "ARN of the role to assume for accessing the ECR repository. Optional.",
-			Required:    false,
-		},
-	}
+var Parameters = []v1beta1.ParameterDefinition{
+	{
+		Name:        RegionParamName,
+		Description: "AWS region of the ECR repository. Defaults to the region configured in the AWS SDK.",
+		Required:    false,
+	},
+	{
+		Name:        ProfileParamName,
+		Description: "ARN of the role to assume for accessing the ECR repository. Optional.",
+		Required:    false,
+	},
 }
 
-func GetAWSFileSecrets() []definitions.FileSecret {
-	return []definitions.FileSecret{
-		{
-			SecretKey: "aws-config",
-			MountPath: ConfigFileMountPath,
-		},
-	}
+var FileSecrets = []definitions.FileSecret{
+	{
+		SecretKey: "aws-config",
+		MountPath: ConfigFileMountPath,
+	},
 }
 
 type Options struct {
