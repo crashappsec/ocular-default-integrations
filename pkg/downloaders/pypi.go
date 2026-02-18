@@ -16,45 +16,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type PyPIRelease struct {
-	Filename string `json:"filename"`
-	URL      string `json:"url"`
+func init() {
+	All.registerDownloader(PyPi)
 }
 
-type PyPIPackageInfo struct {
-	Version string `json:"version"`
-}
-type PyPIMetadata struct {
-	Releases map[string][]PyPIRelease `json:"releases"`
-	Info     PyPIPackageInfo          `json:"info"`
+var PyPi = Downloader{
+	Name:     "pypi",
+	Download: downloadPypi,
 }
 
-type pypi struct{}
-
-func (p pypi) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return nil
-}
-
-func (p pypi) GetFileSecrets() []definitions.FileSecret {
-	return nil
-}
-
-func (p pypi) EnvironmentVariables() []corev1.EnvVar {
-	return nil
-}
-
-var _ Downloader = pypi{}
-
-func (pypi) GetName() string {
-	return "pypi"
-}
-
-func (pypi) Download(ctx context.Context, packageName, version, targetDir string) error {
+func downloadPypi(ctx context.Context, _ map[string]string, packageName, version, targetDir string) error {
 	l := log.FromContext(ctx)
 	// Construct the URL for the PyPI JSON API
 	apiURL := fmt.Sprintf("https://pypi.org/pypi/%s/json", packageName)
@@ -74,7 +48,7 @@ func (pypi) Download(ctx context.Context, packageName, version, targetDir string
 		return fmt.Errorf("failed to fetch metadata: %s", resp.Status)
 	}
 
-	var metadata PyPIMetadata
+	var metadata pypiMetadata
 	if err := json.NewDecoder(resp.Body).Decode(&metadata); err != nil {
 		return fmt.Errorf("failed to decode JSON: %w", err)
 	}
@@ -123,7 +97,15 @@ func (pypi) Download(ctx context.Context, packageName, version, targetDir string
 	return nil
 }
 
-// downloadFile downloads a file from a URL to a local path
-func (pypi) GetMetadataFiles() []string {
-	return nil
+type pypiRelease struct {
+	Filename string `json:"filename"`
+	URL      string `json:"url"`
+}
+
+type pypiPackageInfo struct {
+	Version string `json:"version"`
+}
+type pypiMetadata struct {
+	Releases map[string][]pypiRelease `json:"releases"`
+	Info     pypiPackageInfo          `json:"info"`
 }

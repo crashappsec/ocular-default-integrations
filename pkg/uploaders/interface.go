@@ -18,56 +18,62 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var AllUploaders = []Uploader{
-	s3{},
-	webhook{},
+var All = make(all)
+
+type all map[string]Uploader
+
+func (a all) registerUploader(u Uploader) {
+	if a == nil {
+		return
+	}
+	if u.Upload == nil {
+		panic("upload function must be set")
+	}
+	a[u.Name] = u
 }
 
-type Uploader interface {
-	GetParameters() []v1beta1.ParameterDefinition
-	GetName() string
-	Upload(
+type Uploader struct {
+	Name       string
+	Parameters []v1beta1.ParameterDefinition
+	Upload     func(
 		ctx context.Context,
 		metadata input.PipelineMetadata,
 		params map[string]string,
 		files []string,
 	) error
-	GetEnvSecrets() []definitions.EnvironmentSecret
-	GetFileSecrets() []definitions.FileSecret
-	EnvironmentVariables() []corev1.EnvVar
+	EnvironmentSecrets   []definitions.EnvironmentSecret
+	FileSecrets          []definitions.FileSecret
+	EnvironmentVariables []corev1.EnvVar
 }
 
 func GenerateObjects(image, secretName string) []*v1beta1.ClusterUploader {
-	uploaderObjs := make([]*v1beta1.ClusterUploader, 0, len(AllUploaders))
-	for _, u := range AllUploaders {
-		params := u.GetParameters()
+	uploaderObjs := make([]*v1beta1.ClusterUploader, 0, len(All))
+	for _, u := range All {
+		params := u.Parameters
 		uploaderObj := &v1beta1.ClusterUploader{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: v1beta1.SchemeGroupVersion.String(),
 				Kind:       "ClusterUploader",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: u.GetName(),
+				Name: u.Name,
 			},
 			Spec: v1beta1.UploaderSpec{
 				Container: corev1.Container{
-					Name:  u.GetName(),
+					Name:  u.Name,
 					Image: image,
+					Env:   u.EnvironmentVariables,
 				},
 				Parameters: params,
 			},
 		}
 
-		if envVars := u.EnvironmentVariables(); envVars != nil {
-			uploaderObj.Spec.Container.Env = envVars
+		if u.EnvironmentSecrets != nil {
+			uploaderObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars(secretName, u.EnvironmentSecrets)
 		}
 
-		if envSecrets := u.GetEnvSecrets(); envSecrets != nil {
-			uploaderObj.Spec.Container.Env = definitions.EnvironmentSecretsToEnvVars(secretName, envSecrets)
-		}
-
-		if fileSecrets := u.GetFileSecrets(); fileSecrets != nil {
-			volume, mounts := definitions.FileSecretsToVolumeMounts(secretName, u.GetName(), fileSecrets)
+		if u.FileSecrets != nil {
+			volume, mounts := definitions.FileSecretsToVolumeMounts(secretName, u.Name, u.FileSecrets)
 			uploaderObj.Spec.Volumes = append(uploaderObj.Spec.Volumes, volume)
 			uploaderObj.Spec.Container.VolumeMounts = append(uploaderObj.Spec.Container.VolumeMounts, mounts...)
 		}

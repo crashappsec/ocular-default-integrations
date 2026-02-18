@@ -15,12 +15,10 @@ import (
 	"path/filepath"
 
 	s3Service "github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/pkg/clients/aws"
 	"github.com/crashappsec/ocular-default-integrations/pkg/input"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -30,14 +28,13 @@ const (
 	S3FolderTemplateParamName = "FOLDER_TEMPLATE"
 )
 
-type s3 struct{}
-
-func (s s3) GetName() string {
-	return "s3"
+func init() {
+	All.registerUploader(S3)
 }
 
-func (s s3) GetParameters() []v1beta1.ParameterDefinition {
-	return append(aws.GetParameters(),
+var S3 = Uploader{
+	Name: "s3",
+	Parameters: append(aws.Parameters,
 		v1beta1.ParameterDefinition{
 			Name:        S3BucketParamName,
 			Description: "PipelineName of the S3 bucket to upload to.",
@@ -51,24 +48,12 @@ func (s s3) GetParameters() []v1beta1.ParameterDefinition {
 				"Defaults to '.PipelineName' .",
 			Required: false,
 			Default:  ptr.To(""), // default handled in code, templating gets messed up with helm rendering
-		})
+		}),
+	FileSecrets: aws.FileSecrets,
+	Upload:      uploadS3,
 }
 
-func (s s3) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return nil
-}
-
-func (s s3) GetFileSecrets() []definitions.FileSecret {
-	return aws.GetAWSFileSecrets()
-}
-
-func (s s3) EnvironmentVariables() []corev1.EnvVar {
-	return nil
-}
-
-var _ Uploader = s3{}
-
-func (s s3) Upload(
+func uploadS3(
 	ctx context.Context,
 	metadata input.PipelineMetadata,
 	params map[string]string,

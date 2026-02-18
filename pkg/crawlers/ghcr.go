@@ -11,16 +11,12 @@ package crawlers
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
-	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
-	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/google/go-github/v71/github"
 	"github.com/hashicorp/go-multierror"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -29,10 +25,13 @@ const (
 	RecentTagLimitParam = "RECENT_TAG_LIMIT"
 )
 
-type GHCR struct{}
+func init() {
+	All.registerCrawler(GHCR)
+}
 
-func (g GHCR) GetParameters() []v1beta1.ParameterDefinition {
-	return []v1beta1.ParameterDefinition{
+var GHCR = Crawler{
+	Name: "ghcr",
+	Parameters: []v1beta1.ParameterDefinition{
 		{
 			Name:        GitHubOrgsParamName,
 			Description: "Comma-separated list of Docker Hub organizations to crawl.",
@@ -46,19 +45,22 @@ func (g GHCR) GetParameters() []v1beta1.ParameterDefinition {
 			Required: false,
 			Default:  ptr.To("1"),
 		},
-	}
+	},
+	EnvironmentSecrets: githubAuthenticationEnvironmentSecrets,
+	Crawl:              crawlGHCR,
 }
 
-func (g GHCR) GetName() string {
-	return "ghcr"
-}
+func crawlGHCR(baseCtx context.Context, params map[string]string, queue chan v1beta1.Target) error {
+	l := log.FromContext(baseCtx).WithValues("crawler", "ghcr")
+	ctx := log.IntoContext(baseCtx, l)
 
-func (g GHCR) Crawl(ctx context.Context, params map[string]string, queue chan CrawledTarget) error {
-	l := log.FromContext(ctx).WithValues("crawler", "ghcr")
 	// retrieve params
 	orgs := strings.Split(params[GitHubOrgsParamName], ",")
-	token := os.Getenv(GitHubTokenSecretEnvVar)
-	downloader := downloaders.Docker{}.GetName()
+
+	l.Info("starting GHCR org crawler", "orgs", orgs)
+	if len(orgs) == 0 {
+		return fmt.Errorf("no GHCR orgs specified")
+	}
 
 	limit, err := strconv.Atoi(params[RecentTagLimitParam])
 	if err != nil {
@@ -66,27 +68,20 @@ func (g GHCR) Crawl(ctx context.Context, params map[string]string, queue chan Cr
 		limit = 1
 	}
 
-	client := github.NewClient(nil)
-	if token != "" {
-		client = client.WithAuthToken(token)
-	}
-	if len(orgs) == 0 {
-		return fmt.Errorf("no github org specified")
-	}
-
 	var merr *multierror.Error
 	for _, org := range orgs {
-		// check if org is org or user
-		user, _, err := client.Users.Get(ctx, org)
+		client := createGitHubClientForOrg(ctx, org)
+		isUser, err := isGitHubUser(ctx, client, org)
 		if err != nil {
-			l.Error(err, "error retrieving org info", "org", org)
+			l.Error(err, "Error determining if org is an organization or user", "org", org)
 			merr = multierror.Append(merr, err)
+			continue
 		}
-		var indexer GHCRPackageIndexer = client.Users
-		if user.GetType() == "Organization" {
-			indexer = client.Organizations
+		var indexer GHCRPackageIndexer = client.Organizations
+		if isUser {
+			indexer = client.Users
 		}
-		err = crawlGHCRContainers(ctx, org, downloader, queue, indexer, limit)
+		err = crawlGHCRContainers(ctx, org, queue, indexer, limit)
 		if err != nil {
 			l.Error(err, "Error crawling org", "org", org)
 			merr = multierror.Append(merr, err)
@@ -107,8 +102,8 @@ type GHCRPackageIndexer interface {
 
 func crawlGHCRContainers(
 	ctx context.Context,
-	org, dl string,
-	queue chan CrawledTarget,
+	org string,
+	queue chan v1beta1.Target,
 	indexer GHCRPackageIndexer,
 	tagLimit int,
 ) error {
@@ -133,15 +128,9 @@ func crawlGHCRContainers(
 		}
 		targetID := fmt.Sprintf("ghcr.io/%s/%s", org, container.GetName())
 		for _, version := range versions {
-			target := CrawledTarget{
-				Target: v1beta1.Target{
-					Identifier: targetID,
-					Version:    version,
-				},
-				DefaultDownloader: corev1.ObjectReference{
-					Name: dl,
-					Kind: "ClusterDownloader",
-				},
+			target := v1beta1.Target{
+				Identifier: targetID,
+				Version:    version,
 			}
 			l.Info("Discovered GHCR container", "identifier", targetID, "version", version)
 			queue <- target
@@ -187,22 +176,3 @@ func getRecentGHCRTags(ctx context.Context,
 	}
 	return version, nil
 }
-
-func (g GHCR) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return []definitions.EnvironmentSecret{
-		{
-			SecretKey:  "github-token",
-			EnvVarName: GitHubTokenSecretEnvVar,
-		},
-	}
-}
-
-func (g GHCR) GetFileSecrets() []definitions.FileSecret {
-	return nil
-}
-
-func (g GHCR) EnvironmentVariables() []corev1.EnvVar {
-	return nil
-}
-
-var _ Crawler = GHCR{}

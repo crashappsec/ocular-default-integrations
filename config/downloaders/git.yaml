@@ -17,6 +17,12 @@ spec:
           key: github-app-id
           name: downloader-secrets
           optional: true
+    - name: GITHUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          key: github-token
+          name: downloader-secrets
+          optional: true
     image: downloaders
     name: git
     resources: {}
@@ -27,6 +33,10 @@ spec:
       subPath: gitconfig
   metadataFiles:
   - /mnt/metadata/git.json
+  parameters:
+  - description: Create referecnes to dangling commits (omit to disable)
+    name: CREATE_DANGLING_REFERENCES
+    required: false
   volumes:
   - name: git-file-secrets
     secret:

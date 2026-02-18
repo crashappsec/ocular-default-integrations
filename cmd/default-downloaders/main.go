@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
+	"github.com/crashappsec/ocular-default-integrations/pkg/input"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -72,14 +73,8 @@ func main() {
 		logger.Error(err, "error creating target directory")
 	}
 
-	var downloader downloaders.Downloader
-	for _, d := range downloaders.AllDownloaders {
-		if d.GetName() == downloaderName {
-			downloader = d
-			break
-		}
-	}
-	if downloader == nil {
+	downloader, found := downloaders.All[downloaderName]
+	if !found {
 		logger.Error(
 			fmt.Errorf("unknown downloader %s", downloaderName),
 			"no valid downloader specified",
@@ -87,9 +82,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	params, err := input.ParseParamsFromEnv(downloader.Parameters)
+	if err != nil {
+		logger.Error(err, "unable to parse parameters from environment")
+	}
+
 	l.Info("downloading target")
 
-	err := downloader.Download(ctx, targetIdentifier, targetVersion, targetDir)
+	err = downloader.Download(ctx, params, targetIdentifier, targetVersion, targetDir)
 	if err != nil {
 		l.Error(err, "error downloading target")
 		os.Exit(1)

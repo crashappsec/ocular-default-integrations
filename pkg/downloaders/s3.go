@@ -28,37 +28,28 @@ const (
 	AWSConfigFileMountPath = "/ocular/aws/config"
 )
 
-type s3 struct{}
-
-func (s s3) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return nil
+func init() {
+	All.registerDownloader(S3)
 }
 
-func (s s3) GetFileSecrets() []definitions.FileSecret {
-	return []definitions.FileSecret{
-		{
-			SecretKey: "aws-config",
-			MountPath: AWSConfigFileMountPath,
-		},
-	}
-}
-
-func (s s3) EnvironmentVariables() []corev1.EnvVar {
-	return []corev1.EnvVar{
+var S3 = Downloader{
+	Name: "s3",
+	EnvironmentVariables: []corev1.EnvVar{
 		{
 			Name:  "AWS_CONFIG_FILE",
 			Value: AWSConfigFileMountPath,
 		},
-	}
+	},
+	FileSecrets: []definitions.FileSecret{
+		{
+			SecretKey: "aws-config",
+			MountPath: AWSConfigFileMountPath,
+		},
+	},
+	Download: downloadS3,
 }
 
-var _ Downloader = s3{}
-
-func (s3) GetName() string {
-	return "s3"
-}
-
-func (s3) Download(ctx context.Context, bucketName, version, targetDir string) error {
+func downloadS3(ctx context.Context, _ map[string]string, bucketName, version, targetDir string) error {
 	l := log.FromContext(ctx)
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -134,8 +125,4 @@ func downloadS3Object(
 	// Copy the content to the file
 	_, err = io.Copy(file, output.Body)
 	return err
-}
-
-func (s3) GetMetadataFiles() []string {
-	return nil
 }

@@ -17,24 +17,24 @@ import (
 
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular-default-integrations/pkg/clients/dockerhub"
-	"github.com/crashappsec/ocular-default-integrations/pkg/downloaders"
 	"github.com/crashappsec/ocular/api/v1beta1"
 	"github.com/hashicorp/go-multierror"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
-	DockerHubOrgsParam = "DOCKERHUB_ORGS"
-
+	DockerHubOrgsParam         = "DOCKERHUB_ORGS"
 	DockerHubTokenSecretEnvVar = "DOCKERHUB_TOKEN"
 )
 
-type Dockerhub struct{}
+func init() {
+	All.registerCrawler(Dockerhub)
+}
 
-func (d Dockerhub) GetParameters() []v1beta1.ParameterDefinition {
-	return []v1beta1.ParameterDefinition{
+var Dockerhub = Crawler{
+	Name: "dockerhub",
+	Parameters: []v1beta1.ParameterDefinition{
 		{
 			Name:        DockerHubOrgsParam,
 			Description: "Comma-separated list of Docker Hub organizations to crawl.",
@@ -48,19 +48,21 @@ func (d Dockerhub) GetParameters() []v1beta1.ParameterDefinition {
 			Required: false,
 			Default:  ptr.To("1"),
 		},
-	}
+	},
+	EnvironmentSecrets: []definitions.EnvironmentSecret{
+		{
+			SecretKey:  "dockerhub-token",
+			EnvVarName: DockerHubTokenSecretEnvVar,
+		},
+	},
+	Crawl: crawlDockerhub,
 }
 
-func (d Dockerhub) GetName() string {
-	return "dockerhub"
-}
-
-func (d Dockerhub) Crawl(ctx context.Context, params map[string]string, queue chan CrawledTarget) error {
+func crawlDockerhub(ctx context.Context, params map[string]string, queue chan v1beta1.Target) error {
 	l := log.FromContext(ctx).WithValues("crawler", "dockerhub")
 	// retrieve params
 	orgs := strings.Split(params[DockerHubOrgsParam], ",")
 	token := os.Getenv(DockerHubTokenSecretEnvVar)
-	downloader := downloaders.Docker{}.GetName()
 
 	client := dockerhub.NewClient(dockerhub.Options{
 		AuthToken: token,
@@ -100,15 +102,9 @@ func (d Dockerhub) Crawl(ctx context.Context, params map[string]string, queue ch
 			for _, tag := range tags {
 				targetVersion := tag.Name
 				l.Info("queuing target", "repository", repoName, "tag", targetVersion)
-				queue <- CrawledTarget{
-					DefaultDownloader: corev1.ObjectReference{
-						Name: downloader,
-						Kind: "ClusterDownloader",
-					},
-					Target: v1beta1.Target{
-						Version:    targetVersion,
-						Identifier: repoName,
-					},
+				queue <- v1beta1.Target{
+					Version:    targetVersion,
+					Identifier: repoName,
 				}
 			}
 		}
@@ -116,22 +112,3 @@ func (d Dockerhub) Crawl(ctx context.Context, params map[string]string, queue ch
 
 	return merr.ErrorOrNil()
 }
-
-func (d Dockerhub) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return []definitions.EnvironmentSecret{
-		{
-			SecretKey:  "dockerhub-token",
-			EnvVarName: DockerHubTokenSecretEnvVar,
-		},
-	}
-}
-
-func (d Dockerhub) GetFileSecrets() []definitions.FileSecret {
-	return nil
-}
-
-func (d Dockerhub) EnvironmentVariables() []corev1.EnvVar {
-	return nil
-}
-
-var _ Crawler = Dockerhub{}

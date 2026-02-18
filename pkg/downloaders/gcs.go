@@ -19,36 +19,25 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"google.golang.org/api/iterator"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type gcs struct{}
-
-var _ Downloader = gcs{}
-
-func (gcs) GetName() string {
-	return "gcs"
+func init() {
+	All.registerDownloader(GCS)
 }
 
-func (g gcs) GetEnvSecrets() []definitions.EnvironmentSecret {
-	return []definitions.EnvironmentSecret{
+var GCS = Downloader{
+	Name: "gcs",
+	EnvironmentSecrets: []definitions.EnvironmentSecret{
 		{
 			SecretKey:  "downloader-gcs-credentials",
 			EnvVarName: "GOOGLE_APPLICATION_CREDENTIALS",
 		},
-	}
+	},
+	Download: downloadGCS,
 }
 
-func (g gcs) GetFileSecrets() []definitions.FileSecret {
-	return nil
-}
-
-func (gcs) EnvironmentVariables() []corev1.EnvVar {
-	return nil
-}
-
-func (gcs) Download(ctx context.Context, bucketName, _, targetDir string) error {
+func downloadGCS(ctx context.Context, _ map[string]string, bucketName, _, targetDir string) error {
 	l := log.FromContext(ctx)
 	client, err := storage.NewClient(ctx)
 	if err != nil {
@@ -116,8 +105,4 @@ func downloadGCSObject(
 
 	_, err = io.Copy(f, rc)
 	return err
-}
-
-func (g gcs) GetMetadataFiles() []string {
-	return nil
 }

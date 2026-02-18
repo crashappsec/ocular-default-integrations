@@ -101,6 +101,11 @@ deploy-%: manifests kustomize ## Deploy controller to the K8s cluster specified 
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
+
+undeploy-%: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	$(KUSTOMIZE) build config/$(@:undeploy-%=%)  | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
+
 manifests: ## Generate manifests e.g. CRD, RBAC etc.
 	@$(MAKE) generate
 	@# empty command, since we are not using controller-gen to generate manifests
