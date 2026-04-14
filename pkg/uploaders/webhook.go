@@ -33,12 +33,10 @@ var Webhooks = Uploader{
 		{
 			Name:        WebhookURLParamName,
 			Description: "URL of the webhook to send data to.",
-			Required:    true,
 		},
 		{
 			Name:        WebhookMethodParamName,
 			Description: "The HTTP method to use for the webhook request. Defaults to PUT.",
-			Required:    false,
 			Default:     ptr.To("PUT"),
 		},
 	},

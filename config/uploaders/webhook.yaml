@@ -10,8 +10,6 @@ spec:
   parameters:
   - description: URL of the webhook to send data to.
     name: URL
-    required: true
   - default: PUT
     description: The HTTP method to use for the webhook request. Defaults to PUT.
     name: METHOD
-    required: false

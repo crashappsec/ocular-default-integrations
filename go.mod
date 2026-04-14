@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.2
 	github.com/aws/smithy-go v1.24.1
 	github.com/bradleyfalzon/ghinstallation/v2 v2.17.0
-	github.com/crashappsec/ocular v0.2.6
+	github.com/crashappsec/ocular v0.3.0-alpha.1
 	github.com/go-git/go-git/v6 v6.0.0-20260127175347-b5117ad1603d
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-containerregistry v0.21.1
@@ -18,11 +18,11 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	gitlab.com/gitlab-org/api/client-go v1.45.0
 	google.golang.org/api v0.265.0
-	k8s.io/api v0.35.2
-	k8s.io/apimachinery v0.35.2
-	k8s.io/client-go v0.35.2
+	k8s.io/api v0.35.3
+	k8s.io/apimachinery v0.35.3
+	k8s.io/client-go v0.35.3
 	k8s.io/utils v0.0.0-20260108192941-914a6e750570
-	sigs.k8s.io/controller-runtime v0.23.1
+	sigs.k8s.io/controller-runtime v0.23.3
 )
 
 require (

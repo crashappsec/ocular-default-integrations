@@ -13,19 +13,18 @@ spec:
       readOnly: true
       subPath: aws-config
   parameters:
-  - description: AWS region of the ECR repository. Defaults to the region configured
-      in the AWS SDK.
+  - default: ""
+    description: AWS region of the ECR repository. Defaults to the region configured
+      in the AWS SDK if empty.
     name: AWS_REGION
-    required: false
-  - description: ARN of the role to assume for accessing the ECR repository. Optional.
+  - default: ""
+    description: ARN of the role to assume for accessing the ECR repository. Optional.
     name: AWS_PROFILE
-    required: false
   - default: "1"
     description: Maximum number of tags (versions) to retrieve per image. Will retrieve
       the latest N tags for each ECR image and start a new pipeline for each. Set
       to 0 to retrieve all versions. Defaults to 1.
     name: RECENT_TAG_LIMIT
-    required: false
   volumes:
   - name: ecr-file-secrets
     secret:

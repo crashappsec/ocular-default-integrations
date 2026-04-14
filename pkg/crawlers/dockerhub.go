@@ -38,15 +38,13 @@ var Dockerhub = Crawler{
 		{
 			Name:        DockerHubOrgsParam,
 			Description: "Comma-separated list of Docker Hub organizations to crawl.",
-			Required:    true,
 		},
 		{
 			Name: RecentTagLimitParam,
 			Description: "Maximum number of tags (versions) to retrieve per image. " +
 				"Will retrieve the latest N tags for each docker hub image and start a new pipeline for each. " +
 				"Set to 0 to retrieve all versions. Defaults to 1.",
-			Required: false,
-			Default:  ptr.To("1"),
+			Default: ptr.To("1"),
 		},
 	},
 	EnvironmentSecrets: []definitions.EnvironmentSecret{

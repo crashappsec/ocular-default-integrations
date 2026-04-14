@@ -17,10 +17,8 @@ spec:
   parameters:
   - description: Comma-separated list of Docker Hub organizations to crawl.
     name: DOCKERHUB_ORGS
-    required: true
   - default: "1"
     description: Maximum number of tags (versions) to retrieve per image. Will retrieve
       the latest N tags for each docker hub image and start a new pipeline for each.
       Set to 0 to retrieve all versions. Defaults to 1.
     name: RECENT_TAG_LIMIT
-    required: false

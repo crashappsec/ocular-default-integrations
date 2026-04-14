@@ -38,13 +38,6 @@ func init() {
 
 var Git = Downloader{
 	Name: "git",
-	Parameters: []v1beta1.ParameterDefinition{
-		{
-			Name:        CreateDanglingRefsParamName,
-			Description: "Create referecnes to dangling commits (omit to disable)",
-			Required:    false,
-		},
-	},
 	EnvironmentSecrets: []definitions.EnvironmentSecret{
 		{
 			SecretKey:  "github-app-private-key",
@@ -77,8 +70,7 @@ type GitMetadata struct {
 }
 
 const (
-	CreateDanglingRefsParamName = "CREATE_DANGLING_REFERENCES"
-	CustomScope                 = "/etc/ocular/gitconfig"
+	CustomScope = "/etc/ocular/gitconfig"
 )
 
 func downloadGit(ctx context.Context, params map[string]string, cloneURL, version, targetDir string) error {
@@ -150,12 +142,6 @@ func downloadGit(ctx context.Context, params map[string]string, cloneURL, versio
 	}
 
 	l.Info("cloned Git repository")
-
-	findDanlingRefs := params[CreateDanglingRefsParamName] != ""
-	if findDanlingRefs {
-		// TODO: find dangling references
-		l.Info("dangling refs feature not full supported yet")
-	}
 
 	metadata := GitMetadata{
 		CloneURL: cloneURL,

@@ -181,32 +181,32 @@ build: manifests generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/manager/main.go
 
 
+# PLATFORMS is a list of platforms to
+# build for. Production Ocular images are built
+# with: 'linux/arm64,linux/amd64,linux/s390x,linux/ppc64le'
+PLATFORMS=linux/arm64,linux/amd64
+
+# Additionally, docker args can be set,
+# adding --push will push the image
+DOCKER_ARGS ?= --platform=$(PLATFORMS)
+
+LDFLAGS ?= -X main.version=$(OCULAR_DEFAULTS_VERSION) -X main.buildTime=$(shell date -Iseconds) -X main.gitCommit=$(shell git rev-parse --short HEAD)
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build-all
-docker-build-all: ## Build docker image with the manager.
-	$(MAKE) docker-build-downloaders
-	$(MAKE) docker-build-crawlers
-	$(MAKE) docker-build-uploaders
+docker-build-all: docker-build-img-downloaders docker-build-img-crawlers docker-build-img-uploaders ## Build all integration images
 
-.PHONY: docker-build-uploaders
-docker-build-uploaders: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${OCULAR_UPLOADERS_IMG} --build-arg INTEGRATION=uploaders --build-arg LDFLAGS="$(LDFLAGS)" .
-
-.PHONY: docker-build-downloaders
-docker-build-downloaders: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${OCULAR_DOWNLOADERS_IMG}  --build-arg INTEGRATION=downloaders --build-arg LDFLAGS="$(LDFLAGS)" .
-
-.PHONY: docker-build-crawlers
-docker-build-crawlers: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${OCULAR_CRAWLERS_IMG} --build-arg INTEGRATION=crawlers  --build-arg LDFLAGS="$(LDFLAGS)" .
+docker-build-img-%: ## Builds the docker image
+	@$(CONTAINER_TOOL) build \
+		--build-arg LDFLAGS="$(LDFLAGS)" \
+		--build-arg INTEGRATION=$* \
+		--tag $(OCULAR_$(shell echo '$*' | tr '[:lower:]' '[:upper:]')_IMG) \
+		$(DOCKER_ARGS) \
+		-f Dockerfile .
 
 .PHONY: docker-push-all
-docker-push-all: ## Push docker image with the manager.
-	$(MAKE) docker-push-downloaders
-	$(MAKE) docker-push-crawlers
-	$(MAKE) docker-push-uploaders
+docker-push-all: docker-push-img-downloaders docker-push-img-uploaders docker-push-img-crawlers ## Push docker image with the manager.
 
 .PHONY: docker-push-downloaders
 docker-push-downloaders: ## Push docker image with the manager.
@@ -221,35 +221,8 @@ docker-push-uploaders: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${OCULAR_UPLOADERS_IMG}
 
 
-docker-buildx-all: docker-buildx-crawlers docker-buildx-downloaders docker-buildx-uploaders ## Build and push docker image for the manager for cross-platform support
-
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx OCULAR_CONTROLLER_IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
-# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image to your registry (i.e. if you do not set a valid value via OCULAR_CONTROLLER_IMG=<myregistry/image:<tag>> then the export will fail)
-# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
-.PHONY: docker-buildx-uploaders
-docker-buildx-img-%: ## Build and push docker image for the manager for cross-platform support
-	@echo -e "This will build and \e[31m$$(tput bold)push$$(tput sgr0)\e[0m the image $(OCULAR_$(shell echo '$(@:docker-buildx-img-%=%)' | tr '[:lower:]' '[:upper:]')_IMG) for platforms: ${PLATFORMS}."
-	@read -p "press enter to continue, or ctrl-c to abort: "
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name ocular-builder
-	$(CONTAINER_TOOL) buildx use ocular-builder
-	- $(CONTAINER_TOOL) buildx build --build-arg LDFLAGS="$(LDFLAGS)" --push --platform=$(PLATFORMS) --tag $(OCULAR_$(shell echo '$(@:docker-buildx-img-%=%)' | tr '[:lower:]' '[:upper:]')_IMG) --build-arg INTEGRATION=$(@:docker-buildx-img-%=%) -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm ocular-builder
-	rm Dockerfile.cross
-
-.PHONY: docker-buildx-downloaders
-docker-buildx-downloaders: docker-buildx-img-downloaders ## Build and push docker image for the manager for cross-platform support
-
-.PHONY: docker-buildx-crawlers
-docker-buildx-crawlers: docker-buildx-img-crawlers ## Build and push docker image for the manager for cross-platform support
-
-.PHONY: docker-buildx-uploaders
-docker-buildx-uploaders: docker-buildx-img-uploaders ## Build and push docker image for the manager for cross-platform support
+docker-push-img-%: ## Push docker image with the manager.
+	$(CONTAINER_TOOL) push $(OCULAR_$(shell echo '$*' | tr '[:lower:]' '[:upper:]')_IMG)
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.

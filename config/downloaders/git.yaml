@@ -33,10 +33,6 @@ spec:
       subPath: gitconfig
   metadataFiles:
   - /mnt/metadata/git.json
-  parameters:
-  - description: Create referecnes to dangling commits (omit to disable)
-    name: CREATE_DANGLING_REFERENCES
-    required: false
   volumes:
   - name: git-file-secrets
     secret:

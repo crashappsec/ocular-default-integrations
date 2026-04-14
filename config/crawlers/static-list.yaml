@@ -10,4 +10,3 @@ spec:
   parameters:
   - description: New line separated list of target identifiers to crawl.
     name: TARGET_IDENTIFIERS
-    required: true

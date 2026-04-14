@@ -24,17 +24,15 @@ func ParseParamsFromEnv(
 
 	var merr *multierror.Error
 	for _, def := range definitions {
-		envValue, exists := os.LookupEnv(ocularRuntime.ParameterToEnvironmentVariable(def.Name))
-		if def.Required && !exists {
-			merr = multierror.Append(merr, fmt.Errorf("parameter %s is required", def.Name))
-			continue
-		}
 		var value string
-		if def.Default != nil {
-			value = *def.Default
-		}
+		envValue, exists := os.LookupEnv(ocularRuntime.ParameterToEnvironmentVariable(def.Name))
 		if exists {
 			value = envValue
+		} else if def.Default != nil {
+			value = *def.Default
+		} else {
+			merr = multierror.Append(merr, fmt.Errorf("parameter %s is required", def.Name))
+			continue
 		}
 		params[def.Name] = value
 	}

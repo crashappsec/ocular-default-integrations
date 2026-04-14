@@ -29,9 +29,7 @@ spec:
   parameters:
   - description: Comma-separated list of GitLab groups to crawl.
     name: GITHUB_ORGS
-    required: true
   - default: "false"
     description: If set to anything but '0' or 'false', forked repositories will be
       skipped.
     name: SKIP_FORKS
-    required: false

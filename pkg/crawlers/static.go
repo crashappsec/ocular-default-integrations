@@ -26,7 +26,6 @@ var StaticList = Crawler{
 		{
 			Name:        StaticTargetIdentifierList,
 			Description: "New line separated list of target identifiers to crawl.",
-			Required:    true,
 		},
 	},
 	Crawl: crawlStaticList,

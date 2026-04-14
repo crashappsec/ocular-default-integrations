@@ -24,12 +24,17 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func init() {
 	All.registerDownloader(Docker)
 }
+
+const (
+	DockerTarOutputParamName = "OUTPUT_FILE"
+)
 
 var Docker = Downloader{
 	Name: "docker",
@@ -45,6 +50,12 @@ var Docker = Downloader{
 			MountPath: DockerConfigFolder + "/config.json",
 		},
 	},
+	Parameters: []v1beta1.ParameterDefinition{
+		{
+			Name:    DockerTarOutputParamName,
+			Default: ptr.To("target.tar"),
+		},
+	},
 	MetadataFiles: []string{DockerMetadataPath, DockerChalkMetadataPath},
 	Download:      downloadDocker,
 }
@@ -53,7 +64,7 @@ const DockerConfigFolder = "/ocular/docker"
 
 var shaRegex = regexp.MustCompile(`^sha256:[a-f0-9]{40}$`)
 
-func downloadDocker(ctx context.Context, _ map[string]string, dockerImage, tag, targetDir string) error {
+func downloadDocker(ctx context.Context, params map[string]string, dockerImage, tag, targetDir string) error {
 	if tag == "" {
 		tag = "latest"
 	}
@@ -82,7 +93,9 @@ func downloadDocker(ctx context.Context, _ map[string]string, dockerImage, tag, 
 		return err
 	}
 
-	tarFile, err := os.Create(filepath.Clean(filepath.Join(targetDir, "target.tar")))
+	tarFileName := params[DockerTarOutputParamName]
+
+	tarFile, err := os.Create(filepath.Clean(filepath.Join(targetDir, tarFileName)))
 	if err != nil {
 		return fmt.Errorf("unable to create tar file: %w", err)
 	}
