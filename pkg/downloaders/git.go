@@ -25,6 +25,7 @@ import (
 	gogit "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/client"
 	format "github.com/go-git/go-git/v6/plumbing/format/config"
 	"github.com/go-git/go-git/v6/plumbing/transport"
 	"github.com/go-git/go-git/v6/plumbing/transport/http"
@@ -129,7 +130,9 @@ func downloadGit(ctx context.Context, params map[string]string, cloneURL, versio
 
 	err = repo.FetchContext(ctx, &gogit.FetchOptions{
 		Progress: utils.NewLogWriter(l),
-		Auth:     auth,
+		ClientOptions: []client.Option{
+			client.WithHTTPAuth(auth),
+		},
 	})
 	switch {
 	case errors.Is(err, gogit.NoErrAlreadyUpToDate):
@@ -186,7 +189,7 @@ const (
 	GitHubToken               = "GITHUB_TOKEN"
 )
 
-func handleAuthentication(ctx context.Context, rawCloneURL string) (transport.AuthMethod, error) {
+func handleAuthentication(ctx context.Context, rawCloneURL string) (client.HTTPAuth, error) {
 	l := log.FromContext(ctx)
 
 	cloneURL, err := url.Parse(rawCloneURL)
