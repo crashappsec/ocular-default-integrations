@@ -18,11 +18,8 @@ spec:
   - description: Comma-separated list of GitLab groups to crawl. If empty, the entire
       instance will be crawled.
     name: GITLAB_GROUPS
-    required: false
   - description: The base URL of the GitLab instance to crawl. For GitLab.com, use
       https://gitlab.com/api/v4
     name: GITLAB_INSTANCE_URL
-    required: true
   - description: If set, include projects from subgroups of the specified groups.
     name: INCLUDE_SUBGROUPS
-    required: false

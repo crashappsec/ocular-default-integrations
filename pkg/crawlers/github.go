@@ -52,12 +52,10 @@ var GitHub = Crawler{
 		{
 			Name:        GitHubOrgsParamName,
 			Description: "Comma-separated list of GitLab groups to crawl.",
-			Required:    true,
 		},
 		{
 			Name:        GitHubSkipForksParamName,
 			Description: "If set to anything but '0' or 'false', forked repositories will be skipped.",
-			Required:    false,
 			Default:     ptr.To("false"),
 		},
 	},

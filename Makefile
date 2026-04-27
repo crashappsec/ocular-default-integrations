@@ -174,6 +174,13 @@ lint-fix: golangci-lint license-eye ## Run golangci-lint linter and perform fixe
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	$(GOLANGCI_LINT) config verify
 
+GHASOURCEDIR := ./.github/workflows
+GHASOURCES := $(shell find $(GHASOURCEDIR) -name '*.yaml')
+.PHONY: gha-upgrade
+gha-upgrade: ratchet ## upgrades all pinned github actions used in any workflows
+	@"$(RATCHET)" upgrade $(GHASOURCES)
+
+
 ##@ Build
 
 .PHONY: build
@@ -181,32 +188,32 @@ build: manifests generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/manager/main.go
 
 
+# PLATFORMS is a list of platforms to
+# build for. Production Ocular images are built
+# with: 'linux/arm64,linux/amd64,linux/s390x,linux/ppc64le'
+PLATFORMS ?= linux/arm64,linux/amd64
+
+# Additionally, docker args can be set,
+# adding --push will push the image
+DOCKER_ARGS ?= --platform=$(PLATFORMS)
+
+LDFLAGS ?= -X main.version=$(OCULAR_DEFAULTS_VERSION) -X main.buildTime=$(shell date -Iseconds) -X main.gitCommit=$(shell git rev-parse --short HEAD)
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build-all
-docker-build-all: ## Build docker image with the manager.
-	$(MAKE) docker-build-downloaders
-	$(MAKE) docker-build-crawlers
-	$(MAKE) docker-build-uploaders
+docker-build-all: docker-build-img-downloaders docker-build-img-crawlers docker-build-img-uploaders ## Build all integration images
 
-.PHONY: docker-build-uploaders
-docker-build-uploaders: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${OCULAR_UPLOADERS_IMG} --build-arg INTEGRATION=uploaders --build-arg LDFLAGS="$(LDFLAGS)" .
-
-.PHONY: docker-build-downloaders
-docker-build-downloaders: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${OCULAR_DOWNLOADERS_IMG}  --build-arg INTEGRATION=downloaders --build-arg LDFLAGS="$(LDFLAGS)" .
-
-.PHONY: docker-build-crawlers
-docker-build-crawlers: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${OCULAR_CRAWLERS_IMG} --build-arg INTEGRATION=crawlers  --build-arg LDFLAGS="$(LDFLAGS)" .
+docker-build-img-%: ## Builds the docker image
+	@$(CONTAINER_TOOL) build \
+		--build-arg LDFLAGS="$(LDFLAGS)" \
+		--build-arg INTEGRATION=$* \
+		--tag $(OCULAR_$(shell echo '$*' | tr '[:lower:]' '[:upper:]')_IMG) \
+		$(DOCKER_ARGS) \
+		-f Dockerfile .
 
 .PHONY: docker-push-all
-docker-push-all: ## Push docker image with the manager.
-	$(MAKE) docker-push-downloaders
-	$(MAKE) docker-push-crawlers
-	$(MAKE) docker-push-uploaders
+docker-push-all: docker-push-img-downloaders docker-push-img-uploaders docker-push-img-crawlers ## Push docker image with the manager.
 
 .PHONY: docker-push-downloaders
 docker-push-downloaders: ## Push docker image with the manager.
@@ -221,35 +228,8 @@ docker-push-uploaders: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${OCULAR_UPLOADERS_IMG}
 
 
-docker-buildx-all: docker-buildx-crawlers docker-buildx-downloaders docker-buildx-uploaders ## Build and push docker image for the manager for cross-platform support
-
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx OCULAR_CONTROLLER_IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
-# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image to your registry (i.e. if you do not set a valid value via OCULAR_CONTROLLER_IMG=<myregistry/image:<tag>> then the export will fail)
-# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
-.PHONY: docker-buildx-uploaders
-docker-buildx-img-%: ## Build and push docker image for the manager for cross-platform support
-	@echo -e "This will build and \e[31m$$(tput bold)push$$(tput sgr0)\e[0m the image $(OCULAR_$(shell echo '$(@:docker-buildx-img-%=%)' | tr '[:lower:]' '[:upper:]')_IMG) for platforms: ${PLATFORMS}."
-	@read -p "press enter to continue, or ctrl-c to abort: "
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name ocular-builder
-	$(CONTAINER_TOOL) buildx use ocular-builder
-	- $(CONTAINER_TOOL) buildx build --build-arg LDFLAGS="$(LDFLAGS)" --push --platform=$(PLATFORMS) --tag $(OCULAR_$(shell echo '$(@:docker-buildx-img-%=%)' | tr '[:lower:]' '[:upper:]')_IMG) --build-arg INTEGRATION=$(@:docker-buildx-img-%=%) -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm ocular-builder
-	rm Dockerfile.cross
-
-.PHONY: docker-buildx-downloaders
-docker-buildx-downloaders: docker-buildx-img-downloaders ## Build and push docker image for the manager for cross-platform support
-
-.PHONY: docker-buildx-crawlers
-docker-buildx-crawlers: docker-buildx-img-crawlers ## Build and push docker image for the manager for cross-platform support
-
-.PHONY: docker-buildx-uploaders
-docker-buildx-uploaders: docker-buildx-img-uploaders ## Build and push docker image for the manager for cross-platform support
+docker-push-img-%: ## Push docker image with the manager.
+	$(CONTAINER_TOOL) push $(OCULAR_$(shell echo '$*' | tr '[:lower:]' '[:upper:]')_IMG)
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
@@ -279,35 +259,30 @@ $(LOCALBIN):
 KUBECTL ?= kubectl
 KIND ?= kind
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 YQ ?= $(LOCALBIN)/yq
 CLIENT_GEN ?= $(LOCALBIN)/client-gen
 LICENSE_EYE ?= $(LOCALBIN)/license-eye
+RATCHET ?= $(LOCALBIN)/ratchet
 
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.6.0
-CONTROLLER_TOOLS_VERSION ?= v0.18.0
+KUSTOMIZE_VERSION ?= v5.8.1
+CONTROLLER_TOOLS_VERSION ?= v0.20.1
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
-GOLANGCI_LINT_VERSION ?= v2.8.0
-YQ_VERSION ?= v4.47.1
-CODE_GENERATOR_VERSION ?= v0.34.0
+GOLANGCI_LINT_VERSION ?= v2.11.4
+YQ_VERSION ?= v4.53.2
 LICENSE_EYE_VERSION ?= v0.8.0
+RATCHET_VERSION ?= v0.11.4
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
 	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5,$(KUSTOMIZE_VERSION))
-
-.PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
-$(CONTROLLER_GEN): $(LOCALBIN)
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
 .PHONY: setup-envtest
 setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.
@@ -340,6 +315,12 @@ $(CLIENT_GEN): $(LOCALBIN)
 license-eye: $(LICENSE_EYE) ## Download skywalking-eyes locally if necessary.
 $(LICENSE_EYE): $(LOCALBIN)
 	$(call go-install-tool,$(LICENSE_EYE),github.com/apache/skywalking-eyes/cmd/license-eye,$(LICENSE_EYE_VERSION))
+
+
+ratchet: $(RATCHET) ## Download ratchet locally if necessary.
+$(RATCHET): $(LOCALBIN)
+	$(call go-install-tool,$(RATCHET),github.com/sethvargo/ratchet,$(RATCHET_VERSION))
+
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary

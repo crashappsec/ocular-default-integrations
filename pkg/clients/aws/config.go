@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/crashappsec/ocular-default-integrations/internal/definitions"
 	"github.com/crashappsec/ocular/api/v1beta1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -30,13 +31,13 @@ const (
 var Parameters = []v1beta1.ParameterDefinition{
 	{
 		Name:        RegionParamName,
-		Description: "AWS region of the ECR repository. Defaults to the region configured in the AWS SDK.",
-		Required:    false,
+		Description: "AWS region of the ECR repository. Defaults to the region configured in the AWS SDK if empty.",
+		Default:     ptr.To(""),
 	},
 	{
 		Name:        ProfileParamName,
 		Description: "ARN of the role to assume for accessing the ECR repository. Optional.",
-		Required:    false,
+		Default:     ptr.To(""),
 	},
 }
 

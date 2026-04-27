@@ -38,7 +38,6 @@ var S3 = Uploader{
 		v1beta1.ParameterDefinition{
 			Name:        S3BucketParamName,
 			Description: "PipelineName of the S3 bucket to upload to.",
-			Required:    true,
 		},
 		v1beta1.ParameterDefinition{
 			Name: S3FolderTemplateParamName,
@@ -46,8 +45,7 @@ var S3 = Uploader{
 				"Supports placeholders like .PipelineName, .TargetID, .TargetVersion . " +
 				"Using '/' in the template will create nested folders. " +
 				"Defaults to '.PipelineName' .",
-			Required: false,
-			Default:  ptr.To(""), // default handled in code, templating gets messed up with helm rendering
+			Default: ptr.To(""), // default handled in code, templating gets messed up with helm rendering
 		}),
 	FileSecrets: aws.FileSecrets,
 	Upload:      uploadS3,

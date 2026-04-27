@@ -25,6 +25,7 @@ import (
 	gogit "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/client"
 	format "github.com/go-git/go-git/v6/plumbing/format/config"
 	"github.com/go-git/go-git/v6/plumbing/transport"
 	"github.com/go-git/go-git/v6/plumbing/transport/http"
@@ -38,13 +39,6 @@ func init() {
 
 var Git = Downloader{
 	Name: "git",
-	Parameters: []v1beta1.ParameterDefinition{
-		{
-			Name:        CreateDanglingRefsParamName,
-			Description: "Create referecnes to dangling commits (omit to disable)",
-			Required:    false,
-		},
-	},
 	EnvironmentSecrets: []definitions.EnvironmentSecret{
 		{
 			SecretKey:  "github-app-private-key",
@@ -77,8 +71,7 @@ type GitMetadata struct {
 }
 
 const (
-	CreateDanglingRefsParamName = "CREATE_DANGLING_REFERENCES"
-	CustomScope                 = "/etc/ocular/gitconfig"
+	CustomScope = "/etc/ocular/gitconfig"
 )
 
 func downloadGit(ctx context.Context, params map[string]string, cloneURL, version, targetDir string) error {
@@ -137,7 +130,9 @@ func downloadGit(ctx context.Context, params map[string]string, cloneURL, versio
 
 	err = repo.FetchContext(ctx, &gogit.FetchOptions{
 		Progress: utils.NewLogWriter(l),
-		Auth:     auth,
+		ClientOptions: []client.Option{
+			client.WithHTTPAuth(auth),
+		},
 	})
 	switch {
 	case errors.Is(err, gogit.NoErrAlreadyUpToDate):
@@ -150,12 +145,6 @@ func downloadGit(ctx context.Context, params map[string]string, cloneURL, versio
 	}
 
 	l.Info("cloned Git repository")
-
-	findDanlingRefs := params[CreateDanglingRefsParamName] != ""
-	if findDanlingRefs {
-		// TODO: find dangling references
-		l.Info("dangling refs feature not full supported yet")
-	}
 
 	metadata := GitMetadata{
 		CloneURL: cloneURL,
@@ -200,7 +189,7 @@ const (
 	GitHubToken               = "GITHUB_TOKEN"
 )
 
-func handleAuthentication(ctx context.Context, rawCloneURL string) (transport.AuthMethod, error) {
+func handleAuthentication(ctx context.Context, rawCloneURL string) (client.HTTPAuth, error) {
 	l := log.FromContext(ctx)
 
 	cloneURL, err := url.Parse(rawCloneURL)

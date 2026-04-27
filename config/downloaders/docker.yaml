@@ -18,6 +18,9 @@ spec:
   metadataFiles:
   - /mnt/metadata/docker.json
   - /mnt/metadata/chalk.json
+  parameters:
+  - default: target.tar
+    name: OUTPUT_FILE
   volumes:
   - name: docker-file-secrets
     secret:

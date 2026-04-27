@@ -39,17 +39,14 @@ var GitLab = Crawler{
 		{
 			Name:        GitLabGroupsParamName,
 			Description: "Comma-separated list of GitLab groups to crawl. If empty, the entire instance will be crawled.",
-			Required:    false,
 		},
 		{
 			Name:        GitlabInstanceURLParamName,
 			Description: "The base URL of the GitLab instance to crawl. For GitLab.com, use https://gitlab.com/api/v4",
-			Required:    true,
 		},
 		{
 			Name:        GitlabIncludeSubgroupParamName,
 			Description: "If set, include projects from subgroups of the specified groups.",
-			Required:    false,
 		},
 	},
 	Crawl: crawlGitLab,
