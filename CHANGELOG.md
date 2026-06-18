@@ -1,6 +1,16 @@
 # Ocular Default Integrations Release Notes
 <!-- https://keepachangelog.com -->
-# [v0.1.9](https://github.com/crashappsec/ocular/releases/tag/v0.1.8) - **April 26th, 2026**
+
+# [v0.2.0](https://github.com/crashappsec/ocular/releases/tag/v0.2.0) - **June 18th, 2026**
+
+### Fixed
+
+- Upgrade to Ocular v0.3.2
+- Add templating to helm chart values
+- Bump all dependencies
+- Align Makefile to Ocular
+
+# [v0.1.9](https://github.com/crashappsec/ocular/releases/tag/v0.1.9) - **April 26th, 2026**
 
 ### Fixed
 
