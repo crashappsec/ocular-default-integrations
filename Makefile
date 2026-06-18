@@ -241,7 +241,7 @@ build-installer-%: manifests generate kustomize ## Generate a consolidated YAML 
 	@$(KUSTOMIZE) build config/$(@:build-installer-%=%) > dist/install-$(@:build-installer-%=%).yaml
 
 .PHONY: build-helm
-build-helm: manifests generate kustomize ## Generate a helm chart at dist/chart
+helm-build: manifests generate kustomize ## Generate a helm chart at dist/chart
 	@./hack/scripts/generate-helm-chart.sh
 
 .PHONY: clean-helm
@@ -269,12 +269,12 @@ RATCHET ?= $(LOCALBIN)/ratchet
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
-CONTROLLER_TOOLS_VERSION ?= v0.20.1
+CONTROLLER_TOOLS_VERSION ?= v0.21.0
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
-GOLANGCI_LINT_VERSION ?= v2.11.4
+GOLANGCI_LINT_VERSION ?= v2.12.2
 YQ_VERSION ?= v4.53.2
 LICENSE_EYE_VERSION ?= v0.8.0
 RATCHET_VERSION ?= v0.11.4
@@ -301,6 +301,11 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+	@test -f .custom-gcl.yml && { \
+		echo "Building custom golangci-lint with plugins..." && \
+		$(GOLANGCI_LINT) custom --destination $(LOCALBIN) --name golangci-lint-custom && \
+		mv -f $(LOCALBIN)/golangci-lint-custom $(GOLANGCI_LINT); \
+	} || true
 
 yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
