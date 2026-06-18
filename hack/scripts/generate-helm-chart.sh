@@ -15,51 +15,80 @@ set -e
 CHART_DIRECTORY="${ROOT_DIRECTORY}/dist/chart"
 
 mkdir -p "$CHART_DIRECTORY"
+appVersion="${OCULAR_DEFAULTS_VERSION:-latest}"
 
-if [ ! -f "$CHART_DIRECTORY/Chart.yaml" ]; then
-  cat >"$CHART_DIRECTORY/Chart.yaml" <<EOF
+cat >"$CHART_DIRECTORY/Chart.yaml" <<EOF
 apiVersion: v2
 name: ocular-default-integrations
+version: "${OCULAR_DEFAULTS_HELM_VERSION:-0.0.0}"
+appVersion: "${appVersion#v}"
+kubeVersion: ">=1.26.0-0"
 description: A Helm chart for deploying default ocular integrations
 type: application
-version: 0.1.0
-appVersion: "${OCULAR_DEFAULTS_VERSION:-latest}"
+icon: "https://ocularproject.io/favicon-32x32.png"
+home: https://ocularproject.io
+sources:
+  - https://github.com/crashappsec/ocular-default-integrations
+maintainers:
+  - name: Bryce Thuiot
+    email: bryce@crashoverride.com
+keywords:
+  - git
+  - kubernetes
+  - scanning
+  - sast
+  - secrets
+  - sca
+  - security
+annotations:
+  artifacthub.io/category: security
+  artifacthub.io/license: GPL-3.0
 EOF
-else
-  yq -ie '.appVersion = (strenv(OCULAR_DEFAULTS_VERSION) | sub("^v", ""))' "$CHART_DIRECTORY/Chart.yaml"
-fi
 
-if [ ! -f "$CHART_DIRECTORY/values.yaml" ]; then
-  cat >"$CHART_DIRECTORY/values.yaml" <<EOF
+
+cat >"$CHART_DIRECTORY/values.yaml" <<EOF
+# configuration of crawlers
 crawlers:
   secretName: "crawler-secrets"
   image:
     repository: "ghcr.io/crashappsec/ocular-default-crawlers"
-    tag: "${OCULAR_DEFAULTS_VERSION:-latest}"
+    tag: "v{{ .Chart.AppVersion }}"
+
+# configuration of downloaders
 downloaders:
   secretName: "downloader-secrets"
   image:
     repository: "ghcr.io/crashappsec/ocular-default-downloaders"
-    tag: "${OCULAR_DEFAULTS_VERSION:-latest}"
+    tag: "v{{ .Chart.AppVersion }}"
+
+# Configuration for uploaders
 uploaders:
   secretName: "uploader-secrets"
   image:
     repository: "ghcr.io/crashappsec/ocular-default-uploaders"
-    tag: "${OCULAR_DEFAULTS_VERSION:-latest}"
+    tag: "v{{ .Chart.AppVersion }}"
 EOF
-else
-  yq -ie ".crawlers.image.tag = \"${OCULAR_DEFAULTS_VERSION:-latest}\"" "$CHART_DIRECTORY/values.yaml"
-  yq -ie ".downloaders.image.tag = \"${OCULAR_DEFAULTS_VERSION:-latest}\"" "$CHART_DIRECTORY/values.yaml"
-  yq -ie ".uploaders.image.tag = \"${OCULAR_DEFAULTS_VERSION:-latest}\"" "$CHART_DIRECTORY/values.yaml"
-fi
+ 
 resource_kinds=("crawler" "downloader" "uploader")
 
 for kind in "${resource_kinds[@]}"; do
-  kind_templates_dir="$CHART_DIRECTORY/templates/${kind}s"
-  mkdir -p "$kind_templates_dir"
-  (cd "$kind_templates_dir" && "${ROOT_DIRECTORY}/bin/kustomize" build "$ROOT_DIRECTORY/config/${kind}s" \
-    | sed -e "s/${kind}-secrets/\"{{ .Values.${kind}s.secretName }}\"/g" \
-    | yq ".spec.container.image = \"{{ .Values.${kind}s.image.repository }}:{{ .Values.${kind}s.image.tag }}\"" -s '.metadata.name + ".yaml"')
+    kind_templates_dir="$CHART_DIRECTORY/templates/${kind}s"
+    # create template directory for kind
+    mkdir -p "$kind_templates_dir"
+    # Generate the templates, then have yq edit them
+    # and split them into individual files
+    (cd "$kind_templates_dir" && "${ROOT_DIRECTORY}/bin/kustomize" build "$ROOT_DIRECTORY/config/${kind}s" \
+	     | sed -e "s/${kind}-secrets/\"{{ \$values.${kind}s.secretName }}\"/g" \
+	     | yq ".spec.container.image = \"{{ \$values.${kind}s.image.repository }}:{{ \$values.${kind}s.image.tag }}\"" -s '.metadata.name + ".yaml"')
+    # Add the "values templating" header trick to each file
+    for f in "$kind_templates_dir"/*.yaml; do
+	cat > "$f.tmp" <<'EOF'
+{{- $values := (tpl (.Values | toYaml) $) | fromYaml }}
+{{- $values := (tpl ($values | toYaml) $) | fromYaml }}
+---
+EOF
+    cat "$f" >> "$f.tmp" && mv "$f.tmp" "$f"
+    done
 done
 
 
