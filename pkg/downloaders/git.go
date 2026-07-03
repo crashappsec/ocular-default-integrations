@@ -128,12 +128,15 @@ func downloadGit(ctx context.Context, params map[string]string, cloneURL, versio
 		return err
 	}
 
-	err = repo.FetchContext(ctx, &gogit.FetchOptions{
+	fetchOpts := &gogit.FetchOptions{
 		Progress: utils.NewLogWriter(l),
-		ClientOptions: []client.Option{
-			client.WithHTTPAuth(auth),
-		},
-	})
+	}
+	// go-git panics if WithHTTPAuth is given a nil auth method, which is
+	// the case for anonymous clones of public repositories.
+	if auth != nil {
+		fetchOpts.ClientOptions = []client.Option{client.WithHTTPAuth(auth)}
+	}
+	err = repo.FetchContext(ctx, fetchOpts)
 	switch {
 	case errors.Is(err, gogit.NoErrAlreadyUpToDate):
 		l.Info("repository already up to date")
