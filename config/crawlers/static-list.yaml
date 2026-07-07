@@ -4,7 +4,10 @@ metadata:
   name: static-list
 spec:
   container:
+    command:
+    - /entrypoint
     image: crawlers
+    imagePullPolicy: IfNotPresent
     name: static-list
     resources: {}
   parameters:

@@ -4,10 +4,13 @@ metadata:
   name: s3
 spec:
   container:
+    command:
+    - /entrypoint
     env:
     - name: AWS_CONFIG_FILE
       value: /ocular/aws/config
     image: downloaders
+    imagePullPolicy: IfNotPresent
     name: s3
     resources: {}
     volumeMounts:

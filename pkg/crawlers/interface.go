@@ -60,9 +60,11 @@ func GenerateObjects(image, secretName string) []*v1beta1.ClusterCrawler {
 			},
 			Spec: v1beta1.CrawlerSpec{
 				Container: corev1.Container{
-					Name:  c.Name,
-					Image: image,
-					Env:   c.EnviornmentVariables,
+					Name:            c.Name,
+					Image:           image,
+					Command:         []string{"/entrypoint"},
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Env:             c.EnviornmentVariables,
 				},
 				Parameters: crawlerParams,
 			},

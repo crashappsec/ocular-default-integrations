@@ -4,6 +4,8 @@ metadata:
   name: gcs
 spec:
   container:
+    command:
+    - /entrypoint
     env:
     - name: GOOGLE_APPLICATION_CREDENTIALS
       valueFrom:
@@ -12,5 +14,6 @@ spec:
           name: downloader-secrets
           optional: true
     image: downloaders
+    imagePullPolicy: IfNotPresent
     name: gcs
     resources: {}

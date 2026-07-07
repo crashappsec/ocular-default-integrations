@@ -4,6 +4,8 @@ metadata:
   name: ghcr
 spec:
   container:
+    command:
+    - /entrypoint
     env:
     - name: GITHUB_TOKEN
       valueFrom:
@@ -24,6 +26,7 @@ spec:
           name: crawler-secrets
           optional: true
     image: crawlers
+    imagePullPolicy: IfNotPresent
     name: ghcr
     resources: {}
   parameters:
