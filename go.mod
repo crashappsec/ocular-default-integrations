@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.104.0
 	github.com/aws/smithy-go v1.27.2
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
-	github.com/crashappsec/ocular v0.3.2
+	github.com/crashappsec/ocular v0.4.0
 	github.com/go-git/go-git/v6 v6.0.0-alpha.4
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-containerregistry v0.21.7
