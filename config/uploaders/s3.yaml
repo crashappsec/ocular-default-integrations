@@ -4,7 +4,10 @@ metadata:
   name: s3
 spec:
   container:
+    command:
+    - /entrypoint
     image: uploaders
+    imagePullPolicy: IfNotPresent
     name: s3
     resources: {}
     volumeMounts:

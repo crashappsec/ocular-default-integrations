@@ -4,6 +4,9 @@ metadata:
   name: npm
 spec:
   container:
+    command:
+    - /entrypoint
     image: downloaders
+    imagePullPolicy: IfNotPresent
     name: npm
     resources: {}

@@ -4,6 +4,8 @@ metadata:
   name: git
 spec:
   container:
+    command:
+    - /entrypoint
     env:
     - name: GITHUB_APP_PRIVATE_KEY
       valueFrom:
@@ -24,6 +26,7 @@ spec:
           name: downloader-secrets
           optional: true
     image: downloaders
+    imagePullPolicy: IfNotPresent
     name: git
     resources: {}
     volumeMounts:

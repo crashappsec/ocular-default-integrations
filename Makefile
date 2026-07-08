@@ -107,7 +107,6 @@ undeploy-%: kustomize ## Undeploy controller from the K8s cluster specified in ~
 
 
 manifests: ## Generate manifests e.g. CRD, RBAC etc.
-	@$(MAKE) generate
 	@# empty command, since we are not using controller-gen to generate manifests
 	@# but in order to keep the Makefile structure we leave this target here
 

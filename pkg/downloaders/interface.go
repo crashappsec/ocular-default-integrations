@@ -56,9 +56,11 @@ func GenerateObjects(image, secretName string) []*v1beta1.ClusterDownloader {
 			},
 			Spec: v1beta1.DownloaderSpec{
 				Container: corev1.Container{
-					Name:  d.Name,
-					Image: image,
-					Env:   d.EnvironmentVariables,
+					Name:            d.Name,
+					Image:           image,
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Command:         []string{"/entrypoint"},
+					Env:             d.EnvironmentVariables,
 				},
 				MetadataFiles: d.MetadataFiles,
 				Parameters:    d.Parameters,

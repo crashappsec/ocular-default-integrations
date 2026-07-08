@@ -60,9 +60,11 @@ func GenerateObjects(image, secretName string) []*v1beta1.ClusterUploader {
 			},
 			Spec: v1beta1.UploaderSpec{
 				Container: corev1.Container{
-					Name:  u.Name,
-					Image: image,
-					Env:   u.EnvironmentVariables,
+					Name:            u.Name,
+					Image:           image,
+					Env:             u.EnvironmentVariables,
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Command:         []string{"/entrypoint"},
 				},
 				Parameters: params,
 			},

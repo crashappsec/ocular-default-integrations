@@ -4,6 +4,9 @@ metadata:
   name: pypi
 spec:
   container:
+    command:
+    - /entrypoint
     image: downloaders
+    imagePullPolicy: IfNotPresent
     name: pypi
     resources: {}

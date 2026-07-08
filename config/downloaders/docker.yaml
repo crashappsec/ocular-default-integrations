@@ -4,10 +4,13 @@ metadata:
   name: docker
 spec:
   container:
+    command:
+    - /entrypoint
     env:
     - name: DOCKER_CONFIG
       value: /ocular/docker
     image: downloaders
+    imagePullPolicy: IfNotPresent
     name: docker
     resources: {}
     volumeMounts:

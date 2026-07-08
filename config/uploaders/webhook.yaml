@@ -4,7 +4,10 @@ metadata:
   name: webhook
 spec:
   container:
+    command:
+    - /entrypoint
     image: uploaders
+    imagePullPolicy: IfNotPresent
     name: webhook
     resources: {}
   parameters:

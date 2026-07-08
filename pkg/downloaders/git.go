@@ -105,11 +105,6 @@ func downloadGit(ctx context.Context, params map[string]string, cloneURL, versio
 		}
 	}
 
-	auth, err := handleAuthentication(ctx, cloneURL)
-	if err != nil {
-		l.Error(err, "failed to authenticate")
-	}
-
 	err = repo.SetConfig(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to set custom git config: %w", err)
@@ -128,12 +123,17 @@ func downloadGit(ctx context.Context, params map[string]string, cloneURL, versio
 		return err
 	}
 
-	err = repo.FetchContext(ctx, &gogit.FetchOptions{
+	fetchOpts := &gogit.FetchOptions{
 		Progress: utils.NewLogWriter(l),
-		ClientOptions: []client.Option{
-			client.WithHTTPAuth(auth),
-		},
-	})
+	}
+
+	if auth, err := handleAuthentication(ctx, cloneURL); err != nil {
+		l.Error(err, "failed to authenticate")
+	} else {
+		fetchOpts.ClientOptions = []client.Option{client.WithHTTPAuth(auth)}
+	}
+
+	err = repo.FetchContext(ctx, fetchOpts)
 	switch {
 	case errors.Is(err, gogit.NoErrAlreadyUpToDate):
 		l.Info("repository already up to date")
