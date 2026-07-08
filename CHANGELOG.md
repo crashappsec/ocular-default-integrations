@@ -1,7 +1,18 @@
 # Ocular Default Integrations Release Notes
 <!-- https://keepachangelog.com -->
+# [v0.2.1](https://github.com/crashappsec/ocular/releases/tag/v0.2.1) - **July 8th, 2026**
 
-# [v0.2.0](https://github.com/crashappsec/ocular/releases/tag/v0.2.0) - **June 18th, 2026**
+### Fixed
+
+- Fix panic on nil authentication for git downloader
+
+### Changes
+
+- Upgrade to Ocular v0.4.0
+- Add resource requirements and command for containers
+
+
+# [v0.2.0](https://github.com/crashappsec/ocular-default-integrations/releases/tag/v0.2.0) - **June 18th, 2026**
 
 ### Fixed
 
@@ -10,20 +21,20 @@
 - Bump all dependencies
 - Align Makefile to Ocular
 
-# [v0.1.9](https://github.com/crashappsec/ocular/releases/tag/v0.1.9) - **April 26th, 2026**
+# [v0.1.9](https://github.com/crashappsec/ocular-default-integrations/releases/tag/v0.1.9) - **April 26th, 2026**
 
 ### Fixed
 
 - Upgrade to Ocular v0.3.0
 - Improve docker build times on cross platform images
 
-# [v0.1.8](https://github.com/crashappsec/ocular/releases/tag/v0.1.8) - **February 17th, 2026**
+# [v0.1.8](https://github.com/crashappsec/ocular-default-integrations/releases/tag/v0.1.8) - **February 17th, 2026**
 
 ### Fixed
 
 - Use new search scheduler for crawlers over manual kubernetes API interaction
 
-# [v0.1.7](https://github.com/crashappsec/ocular/releases/tag/v0.1.7) - **February 3rd, 2026**
+# [v0.1.7](https://github.com/crashappsec/ocular-default-integrations/releases/tag/v0.1.7) - **February 3rd, 2026**
 
 ### Fixed
 
@@ -33,7 +44,7 @@
   - `Uploader` changed to `ClusterUploader`
 
 
-# [v0.1.6](https://github.com/crashappsec/ocular/releases/tag/v0.1.6) - **December 10, 2025**
+# [v0.1.6](https://github.com/crashappsec/ocular-default-integrations/releases/tag/v0.1.6) - **December 10, 2025**
 
 ### Fixed
 
@@ -41,14 +52,14 @@
 - Add support for GitHub app installation tokens in GitHub crawler and git downloader
 
 
-# [v0.1.5](https://github.com/crashappsec/ocular/releases/tag/v0.1.5) - **December 3, 2025**
+# [v0.1.5](https://github.com/crashappsec/ocular-default-integrations/releases/tag/v0.1.5) - **December 3, 2025**
 
 ### Fixed
 
 - Git downloader now writes object files with permission `0644` to allow any other containers/processes to read them.
 
 
-# [v0.1.4](https://github.com/crashappsec/ocular/releases/tag/v0.1.4) - **November 13, 2025**
+# [v0.1.4](https://github.com/crashappsec/ocular-default-integrations/releases/tag/v0.1.4) - **November 13, 2025**
 
 ### Added
 
@@ -62,12 +73,12 @@
 - S3 file key for uploads can now be templated using Go templates.
 
 
-# [v0.1.3](https://github.com/crashappsec/ocular/releases/tag/v0.1.3) - **October 1, 2025**
+# [v0.1.3](https://github.com/crashappsec/ocular-default-integrations/releases/tag/v0.1.3) - **October 1, 2025**
 
 ### Added
 - Added ability to specify scan/upload service accounts for all default crawlers
 
-# [v0.1.2](https://github.com/crashappsec/ocular/releases/tag/v0.1.2) - **September 30, 2025**
+# [v0.1.2](https://github.com/crashappsec/ocular-default-integrations/releases/tag/v0.1.2) - **September 30, 2025**
 
 ### Added
 - Aligned with Ocular v0.2.0 release.
@@ -79,7 +90,7 @@
 
 - Removed support for Ocular API definitions in favor of Kubernetes-native management using CRDs.
 
-# [v0.1.1](https://github.com/crashappsec/ocular/releases/tag/v0.1.1) - **July 29, 2025**
+# [v0.1.1](https://github.com/crashappsec/ocular-default-integrations/releases/tag/v0.1.1) - **July 29, 2025**
 
 ### Added
 
@@ -92,7 +103,7 @@
 - Decrease token cache time to live from 1 hour to 5 minutes to ensure more frequent updates and reduce the risk of using stale tokens.
 
 
-# [v0.1.0](https://github.com/crashappsec/ocular/releases/tag/v0.1.0) - **July 15, 2025**
+# [v0.1.0](https://github.com/crashappsec/ocular-default-integrations/releases/tag/v0.1.0) - **July 15, 2025**
 
 ### Added
 
